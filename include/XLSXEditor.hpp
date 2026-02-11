@@ -7,6 +7,8 @@
 #include <cc/neolux/utils/MiniXLSX/OpenXLSXWrapper.hpp>
 #include "DataTypes.hpp"
 #include <QProgressDialog>
+#include <QtConcurrent>
+#include <QFuture>
 
 namespace Ui {
 class XLSXEditor;

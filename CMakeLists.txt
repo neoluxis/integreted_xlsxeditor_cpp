@@ -8,7 +8,7 @@ set(CMAKE_BUILD_TYPE Debug)
 message("Integrated XLSX editor in femapp")
 
 # Find Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets LinguistTools)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets LinguistTools Concurrent)
 
 # Enable Qt MOC, RCC, UIC
 set(CMAKE_AUTOMOC ON)
@@ -60,6 +60,7 @@ target_include_directories(XLSXEditor PUBLIC
 target_link_libraries(XLSXEditor PUBLIC
     Qt6::Core
     Qt6::Widgets
+    Qt6::Concurrent
     MiniXLSX
 )
 

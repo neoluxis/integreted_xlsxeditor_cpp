@@ -115,27 +115,40 @@ void XLSXEditor::loadData(QProgressDialog &progress)
     int startRow, startCol, endRow, endCol;
     parseRange(m_range, startRow, startCol, endRow, endCol);
 
-    int current = 0;
-    // For each cell in range, check if it has picture
+    struct CellInfo {
+        int row, col;
+    };
+    QList<CellInfo> cells;
     for (int row = startRow; row <= endRow; ++row) {
         for (int col = startCol; col <= endCol; ++col) {
-            progress.setValue(++current);
-            if (progress.wasCanceled()) {
-                return;
-            }
-            QString cellRef = numToCol(col) + QString::number(row);
-            auto rawOpt = m_wrapper->getPictureRaw(static_cast<unsigned int>(m_sheetIndex), cellRef.toStdString());
-            if (rawOpt.has_value()) {
-                const std::vector<uint8_t> &bytes = rawOpt.value();
-                QImage image = QImage::fromData(bytes.data(), bytes.size());
-                // Get description from cell below
-                QString descCell = numToCol(col) + QString::number(row + 1);
-                auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString());
-                QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
-                m_data.append({row, col, image, desc, false});
-            }
+            cells.append({row, col});
         }
     }
+
+    auto processCell = [this](const CellInfo &ci) -> std::optional<DataEntry> {
+        QString cellRef = numToCol(ci.col) + QString::number(ci.row);
+        auto rawOpt = m_wrapper->getPictureRaw(static_cast<unsigned int>(m_sheetIndex), cellRef.toStdString());
+        if (rawOpt.has_value()) {
+            const std::vector<uint8_t> &bytes = rawOpt.value();
+            QImage image = QImage::fromData(bytes.data(), bytes.size());
+            QString descCell = numToCol(ci.col) + QString::number(ci.row + 1);
+            auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString());
+            QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
+            return DataEntry{ci.row, ci.col, image, desc, false};
+        }
+        return std::nullopt;
+    };
+
+    QFuture<std::optional<DataEntry>> future = QtConcurrent::mapped(cells, processCell);
+    future.waitForFinished(); // wait
+
+    for (auto &opt : future.results()) {
+        if (opt.has_value()) {
+            m_data.append(opt.value());
+        }
+    }
+
+    progress.setValue(cells.size());
 }
 
 void XLSXEditor::displayData()
