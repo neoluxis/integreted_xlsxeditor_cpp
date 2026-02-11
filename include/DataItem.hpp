@@ -28,6 +28,7 @@ public:
 
 signals:
     void deleteToggled(bool deleted);
+    void imageClicked(int row, int col);
 
 private slots:
     void on_btnMarkDel_clicked();

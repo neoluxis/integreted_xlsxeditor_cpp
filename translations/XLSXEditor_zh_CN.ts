@@ -23,35 +23,40 @@
     </message>
     <message>
         <location filename="../src/XLSXEditor.ui" line="22"/>
-        <location filename="../src/XLSXEditor.cpp" line="181"/>
+        <location filename="../src/XLSXEditor.cpp" line="198"/>
         <source>Restore</source>
         <translation>恢复</translation>
     </message>
     <message>
         <location filename="../src/XLSXEditor.ui" line="29"/>
-        <location filename="../src/XLSXEditor.cpp" line="175"/>
+        <location filename="../src/XLSXEditor.cpp" line="192"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="66"/>
+        <location filename="../src/XLSXEditor.cpp" line="69"/>
         <source>Loading data...</source>
         <translation>加载数据中...</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="66"/>
+        <location filename="../src/XLSXEditor.cpp" line="69"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="175"/>
+        <location filename="../src/XLSXEditor.cpp" line="192"/>
         <source>Data saved to XLSX.</source>
         <translation>数据已保存到XLSX。</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="181"/>
+        <location filename="../src/XLSXEditor.cpp" line="198"/>
         <source>Data restored.</source>
         <translation>数据已恢复。</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="223"/>
+        <source>Image Preview</source>
+        <translation>图片预览</translation>
     </message>
 </context>
 </TS>

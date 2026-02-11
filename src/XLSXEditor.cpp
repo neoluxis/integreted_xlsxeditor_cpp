@@ -5,6 +5,9 @@
 #include <QMessageBox>
 #include <QFile>
 #include <QDir>
+#include <QDialog>
+#include <QLabel>
+#include <QVBoxLayout>
 
 XLSXEditor::XLSXEditor(QWidget *parent) :
     QWidget(parent),
@@ -125,27 +128,25 @@ void XLSXEditor::loadData(QProgressDialog &progress)
         }
     }
 
-    auto processCell = [this](const CellInfo &ci) -> std::optional<DataEntry> {
+    auto processCell = [this](const CellInfo &ci) -> DataEntry {
+        DataEntry entry{ci.row, ci.col, QImage(), "", false};
         QString cellRef = numToCol(ci.col) + QString::number(ci.row);
         auto rawOpt = m_wrapper->getPictureRaw(static_cast<unsigned int>(m_sheetIndex), cellRef.toStdString());
         if (rawOpt.has_value()) {
             const std::vector<uint8_t> &bytes = rawOpt.value();
-            QImage image = QImage::fromData(bytes.data(), bytes.size());
+            entry.image = QImage::fromData(bytes.data(), bytes.size());
             QString descCell = numToCol(ci.col) + QString::number(ci.row + 1);
             auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString());
-            QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
-            return DataEntry{ci.row, ci.col, image, desc, false};
+            entry.desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
         }
-        return std::nullopt;
+        return entry;
     };
 
-    QFuture<std::optional<DataEntry>> future = QtConcurrent::mapped(cells, processCell);
-    future.waitForFinished(); // wait
+    QFuture<DataEntry> future = QtConcurrent::mapped(cells, processCell);
+    future.waitForFinished();
 
-    for (auto &opt : future.results()) {
-        if (opt.has_value()) {
-            m_data.append(opt.value());
-        }
+    for (auto &entry : future.results()) {
+        m_data.append(entry);
     }
 
     progress.setValue(cells.size());
@@ -178,6 +179,7 @@ void XLSXEditor::displayData()
         connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {
             m_data[i].deleted = deleted;
         });
+        connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
         m_dataItems.append(item);
     }
 }
@@ -209,6 +211,23 @@ void XLSXEditor::saveData()
         m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(), cs);
     }
     m_wrapper->save();
+}
+
+void XLSXEditor::showImageDialog(int row, int col)
+{
+    for (const auto &entry : m_data) {
+        if (entry.row == row && entry.col == col && !entry.image.isNull()) {
+            QDialog dialog(this);
+            dialog.setWindowTitle(tr("Image Preview"));
+            QLabel *label = new QLabel(&dialog);
+            label->setPixmap(QPixmap::fromImage(entry.image));
+            QVBoxLayout *layout = new QVBoxLayout(&dialog);
+            layout->addWidget(label);
+            dialog.setLayout(layout);
+            dialog.exec();
+            break;
+        }
+    }
 }
 
 void XLSXEditor::restoreData()

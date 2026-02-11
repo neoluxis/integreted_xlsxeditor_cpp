@@ -29,6 +29,7 @@ public:
 private slots:
     void on_btnSave_clicked();
     void on_btnRestore_clicked();
+    void showImageDialog(int row, int col);
 
 private:
     Ui::XLSXEditor *ui;

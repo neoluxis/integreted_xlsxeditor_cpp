@@ -11,7 +11,9 @@ DataItem::DataItem(QWidget *parent) :
     m_col(-1)
 {
     ui->setupUi(this);
+    setStyleSheet("border: 1px solid lightgray;");
     connect(ui->btnMarkDel, &QPushButton::clicked, this, &DataItem::on_btnMarkDel_clicked);
+    connect(ui->btnImage, &QPushButton::clicked, this, [this]() { emit imageClicked(m_row, m_col); });
 }
 
 DataItem::~DataItem()
@@ -21,10 +23,12 @@ DataItem::~DataItem()
 
 void DataItem::setImage(const QImage &image)
 {
-    QPixmap pixmap = QPixmap::fromImage(image);
-    QLabel *label = new QLabel(this);
-    label->setPixmap(pixmap.scaled(100, 100, Qt::KeepAspectRatio));
-    ui->gridPicture->addWidget(label, 0, 0);
+    if (!image.isNull()) {
+        QPixmap pixmap = QPixmap::fromImage(image);
+        ui->btnImage->setIcon(QIcon(pixmap.scaled(70, 70, Qt::KeepAspectRatio)));
+    } else {
+        ui->btnImage->setIcon(QIcon());
+    }
 }
 
 void DataItem::setDescription(const QString &desc)
