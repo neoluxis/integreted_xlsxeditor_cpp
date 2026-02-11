@@ -6,6 +6,13 @@
 using namespace cc::neolux::fem::xlsxeditor;
 
 int main(int argc, char *argv[]) {
+
+    if (argc < 2) {
+        qWarning("Usage: %s <xlsx-file>", argv[0]);
+        return -1;
+    }
+    std::string xlsxFile = argv[1];
+
     QApplication app(argc, argv);
 
     // Load translations
@@ -17,7 +24,7 @@ int main(int argc, char *argv[]) {
     // For testing, create a main window and embed XLSXEditor
     QMainWindow window;
     XLSXEditor *editor = new XLSXEditor(&window);
-    editor->loadXLSX("../assets/test.xlsx", "SO13(DNo.3)MS", "B:K,7:34");
+    editor->loadXLSX(QString::fromStdString(xlsxFile), "SO13(DNo.3)MS", "B:K,7:34");
     window.setCentralWidget(editor);
     window.show();
 
