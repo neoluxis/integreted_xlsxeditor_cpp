@@ -34,8 +34,8 @@ qt6_wrap_ui(UI_HEADERS
 set(WIDGET_SRC
     src/XLSXEditor.cpp
     src/DataItem.cpp
-    include/XLSXEditor.hpp
-    include/DataItem.hpp
+    include/cc/neolux/fem/xlsxeditor/XLSXEditor.hpp
+    include/cc/neolux/fem/xlsxeditor/DataItem.hpp
     ${UI_HEADERS}
 )
 
@@ -47,7 +47,7 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
 endif()
 
 # Create library
-add_library(XLSXEditor ${WIDGET_SRC})
+add_library(XLSXEditor SHARED ${WIDGET_SRC})
 
 # Include directories
 target_include_directories(XLSXEditor PUBLIC

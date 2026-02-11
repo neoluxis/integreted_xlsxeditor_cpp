@@ -1,7 +1,9 @@
-#include "DataItem.hpp"
+#include "cc/neolux/fem/xlsxeditor/DataItem.hpp"
 #include "ui_DataItem.h"
 #include <QPixmap>
 #include <QLabel>
+
+using namespace cc::neolux::fem::xlsxeditor;
 
 DataItem::DataItem(QWidget *parent) :
     QWidget(parent),

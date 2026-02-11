@@ -1,7 +1,9 @@
 #include <QApplication>
 #include <QMainWindow>
 #include <QTranslator>
-#include "XLSXEditor.hpp"
+#include "cc/neolux/fem/xlsxeditor/XLSXEditor.hpp"
+
+using namespace cc::neolux::fem::xlsxeditor;
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);

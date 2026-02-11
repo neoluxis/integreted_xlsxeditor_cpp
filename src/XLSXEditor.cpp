@@ -1,13 +1,15 @@
-#include "XLSXEditor.hpp"
-#include "DataItem.hpp"
+#include "cc/neolux/fem/xlsxeditor/XLSXEditor.hpp"
+#include "cc/neolux/fem/xlsxeditor/DataItem.hpp"
 #include "ui_XLSXEditor.h"
 #include <QGridLayout>
 #include <QMessageBox>
 #include <QFile>
-#include <QDir>
 #include <QDialog>
 #include <QLabel>
 #include <QVBoxLayout>
+#include <QProgressDialog>
+
+using namespace cc::neolux::fem::xlsxeditor;
 
 XLSXEditor::XLSXEditor(QWidget *parent) :
     QWidget(parent),

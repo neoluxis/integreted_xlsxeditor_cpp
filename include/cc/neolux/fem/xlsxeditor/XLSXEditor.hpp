@@ -3,12 +3,24 @@
 #include <QWidget>
 #include <QString>
 #include <QVector>
-#include <QPair>
+#include <QProgressDialog>
 #include <cc/neolux/utils/MiniXLSX/OpenXLSXWrapper.hpp>
 
 namespace Ui {
 class XLSXEditor;
 }
+
+namespace cc {
+namespace neolux {
+namespace fem {
+namespace xlsxeditor {
+
+struct DataEntry {
+    int row, col;
+    QImage image;
+    QString desc;
+    bool deleted;
+};
 
 class DataItem;
 
@@ -27,11 +39,6 @@ private slots:
     void on_btnRestore_clicked();
 
 private:
-    struct DataEntry {
-        int row, col;
-        QImage image;
-        QString desc;
-    };
 
     Ui::XLSXEditor *ui;
     QString m_filePath;
@@ -44,7 +51,16 @@ private:
 
     void parseRange(const QString &range, int &startRow, int &startCol, int &endRow, int &endCol);
     void loadData();
+    void loadData(QProgressDialog &progress);
     void displayData();
     void saveData();
     void restoreData();
+    int colToNum(const QString &col);
+    QString numToCol(int num);
+    void showImageDialog(int row, int col);
 };
+
+} // namespace xlsxeditor
+} // namespace fem
+} // namespace neolux
+} // namespace cc
