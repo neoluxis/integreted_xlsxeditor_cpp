@@ -165,6 +165,8 @@ void XLSXEditor::displayData()
     parseRange(m_range, startRow, startCol, endRow, endCol);
 
     QGridLayout *layout = ui->gridData;
+    layout->setSpacing(0);
+    layout->setContentsMargins(0, 0, 0, 0);
 
     for (int i = 0; i < m_data.size(); ++i) {
         const auto &entry = m_data[i];
