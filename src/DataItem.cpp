@@ -11,7 +11,7 @@ DataItem::DataItem(QWidget *parent) :
     m_col(-1)
 {
     ui->setupUi(this);
-    setStyleSheet("border: 1px solid lightgray;");
+    setStyleSheet("border: 2px solid gray;");
     connect(ui->btnMarkDel, &QPushButton::clicked, this, &DataItem::on_btnMarkDel_clicked);
     connect(ui->btnImage, &QPushButton::clicked, this, [this]() { emit imageClicked(m_row, m_col); });
 }

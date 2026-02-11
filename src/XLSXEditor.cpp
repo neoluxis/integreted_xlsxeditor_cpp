@@ -159,8 +159,6 @@ void XLSXEditor::displayData()
     layout->setSpacing(0);
     layout->setContentsMargins(0, 0, 0, 0);
 
-    int row = 0, col = 0;
-    const int maxCols = 3;
     for (int i = 0; i < m_data.size(); ++i) {
         const auto &entry = m_data[i];
         if (!entry.image.isNull()) {
@@ -169,17 +167,14 @@ void XLSXEditor::displayData()
             item->setDescription(entry.desc);
             item->setDeleted(entry.deleted);
             item->setRowCol(entry.row, entry.col);
-            layout->addWidget(item, row, col);
+            int gridRow = (entry.row - startRow) / 2; // Compress rows, assuming picture rows are every other row
+            int gridCol = entry.col - startCol;
+            layout->addWidget(item, gridRow, gridCol);
             connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {
                 m_data[i].deleted = deleted;
             });
             connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
             m_dataItems.append(item);
-            col++;
-            if (col >= maxCols) {
-                col = 0;
-                row++;
-            }
         }
     }
 }
