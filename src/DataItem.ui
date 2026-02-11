@@ -13,44 +13,40 @@
   <property name="windowTitle">
    <string>DataItem</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout">
-   <item row="0" column="0">
-    <layout class="QVBoxLayout" name="vbContain" stretch="0,1,0">
-     <item>
-      <layout class="QHBoxLayout" name="hbControl">
-       <item>
-        <widget class="QPushButton" name="btnMarkDel">
-         <property name="text">
-          <string>Delete</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btnImage">
-       <property name="minimumSize">
-        <size>
-         <width>80</width>
-         <height>80</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>120</width>
-         <height>120</height>
-        </size>
-       </property>
-       <property name="iconSize">
-        <size>
-         <width>70</width>
-         <height>70</height>
-        </size>
-       </property>
-      </widget>
-     </item>
+  <layout class="QHBoxLayout" name="horizontalLayout">
+   <item>
+    <widget class="QPushButton" name="btnImage">
+     <property name="minimumSize">
+      <size>
+       <width>80</width>
+       <height>80</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>120</width>
+       <height>120</height>
+      </size>
+     </property>
+     <property name="iconSize">
+      <size>
+       <width>70</width>
+       <height>70</height>
+      </size>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="verticalLayout">
      <item>
       <widget class="QLineEdit" name="lnData"/>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnMarkDel">
+       <property name="text">
+        <string>Delete</string>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>

@@ -118,38 +118,29 @@ void XLSXEditor::loadData(QProgressDialog &progress)
     int startRow, startCol, endRow, endCol;
     parseRange(m_range, startRow, startCol, endRow, endCol);
 
-    struct CellInfo {
-        int row, col;
-    };
-    QList<CellInfo> cells;
+    int current = 0;
+    // For each cell in range, check if it has picture
     for (int row = startRow; row <= endRow; ++row) {
         for (int col = startCol; col <= endCol; ++col) {
-            cells.append({row, col});
+            progress.setValue(++current);
+            if (progress.wasCanceled()) {
+                return;
+            }
+            QString cellRef = numToCol(col) + QString::number(row);
+            auto rawOpt = m_wrapper->getPictureRaw(static_cast<unsigned int>(m_sheetIndex), cellRef.toStdString());
+            if (rawOpt.has_value()) {
+                const std::vector<uint8_t> &bytes = rawOpt.value();
+                QImage image = QImage::fromData(bytes.data(), bytes.size());
+                // Get description from cell below
+                QString descCell = numToCol(col) + QString::number(row + 1);
+                auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString());
+                QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
+                m_data.append({row, col, image, desc, false});
+            } else {
+                m_data.append({row, col, QImage(), "", false});
+            }
         }
     }
-
-    auto processCell = [this](const CellInfo &ci) -> DataEntry {
-        DataEntry entry{ci.row, ci.col, QImage(), "", false};
-        QString cellRef = numToCol(ci.col) + QString::number(ci.row);
-        auto rawOpt = m_wrapper->getPictureRaw(static_cast<unsigned int>(m_sheetIndex), cellRef.toStdString());
-        if (rawOpt.has_value()) {
-            const std::vector<uint8_t> &bytes = rawOpt.value();
-            entry.image = QImage::fromData(bytes.data(), bytes.size());
-            QString descCell = numToCol(ci.col) + QString::number(ci.row + 1);
-            auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString());
-            entry.desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
-        }
-        return entry;
-    };
-
-    QFuture<DataEntry> future = QtConcurrent::mapped(cells, processCell);
-    future.waitForFinished();
-
-    for (auto &entry : future.results()) {
-        m_data.append(entry);
-    }
-
-    progress.setValue(cells.size());
 }
 
 void XLSXEditor::displayData()
@@ -168,30 +159,27 @@ void XLSXEditor::displayData()
     layout->setSpacing(0);
     layout->setContentsMargins(0, 0, 0, 0);
 
+    int row = 0, col = 0;
+    const int maxCols = 3;
     for (int i = 0; i < m_data.size(); ++i) {
         const auto &entry = m_data[i];
-        int gridRow = entry.row - startRow;
-        int gridCol = entry.col - startCol;
-
-        if (entry.image.isNull()) {
-            // Empty cell without border
-            QWidget *emptyWidget = new QWidget(this);
-            emptyWidget->setMinimumSize(100, 100);
-            layout->addWidget(emptyWidget, gridRow, gridCol);
-            m_dataItems.append(emptyWidget);
-        } else {
-            // Data item
+        if (!entry.image.isNull()) {
             DataItem *item = new DataItem(this);
             item->setImage(entry.image);
             item->setDescription(entry.desc);
             item->setDeleted(entry.deleted);
             item->setRowCol(entry.row, entry.col);
-            layout->addWidget(item, gridRow, gridCol);
+            layout->addWidget(item, row, col);
             connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {
                 m_data[i].deleted = deleted;
             });
             connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
             m_dataItems.append(item);
+            col++;
+            if (col >= maxCols) {
+                col = 0;
+                row++;
+            }
         }
     }
 }
