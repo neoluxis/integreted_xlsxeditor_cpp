@@ -37,7 +37,7 @@ private:
     QString m_sheetName;
     QString m_range;
     QVector<DataEntry> m_data; // image and description with position
-    QVector<DataItem*> m_dataItems;
+    QVector<QWidget*> m_dataItems;
     cc::neolux::utils::MiniXLSX::OpenXLSXWrapper *m_wrapper;
     int m_sheetIndex;
 

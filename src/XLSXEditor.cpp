@@ -168,19 +168,30 @@ void XLSXEditor::displayData()
 
     for (int i = 0; i < m_data.size(); ++i) {
         const auto &entry = m_data[i];
-        DataItem *item = new DataItem(this);
-        item->setImage(entry.image);
-        item->setDescription(entry.desc);
-        item->setDeleted(entry.deleted);
-        item->setRowCol(entry.row, entry.col);
         int gridRow = entry.row - startRow;
         int gridCol = entry.col - startCol;
-        layout->addWidget(item, gridRow, gridCol);
-        connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {
-            m_data[i].deleted = deleted;
-        });
-        connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
-        m_dataItems.append(item);
+
+        if (entry.image.isNull()) {
+            // Empty cell with border
+            QWidget *emptyWidget = new QWidget(this);
+            emptyWidget->setStyleSheet("border: 1px solid lightgray;");
+            emptyWidget->setMinimumSize(100, 100); // Set size to match DataItem
+            layout->addWidget(emptyWidget, gridRow, gridCol);
+            m_dataItems.append(emptyWidget); // Store for cleanup
+        } else {
+            // Data item
+            DataItem *item = new DataItem(this);
+            item->setImage(entry.image);
+            item->setDescription(entry.desc);
+            item->setDeleted(entry.deleted);
+            item->setRowCol(entry.row, entry.col);
+            layout->addWidget(item, gridRow, gridCol);
+            connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {
+                m_data[i].deleted = deleted;
+            });
+            connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
+            m_dataItems.append(item);
+        }
     }
 }
 
