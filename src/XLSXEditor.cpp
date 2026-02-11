@@ -174,12 +174,11 @@ void XLSXEditor::displayData()
         int gridCol = entry.col - startCol;
 
         if (entry.image.isNull()) {
-            // Empty cell with border
+            // Empty cell without border
             QWidget *emptyWidget = new QWidget(this);
-            emptyWidget->setStyleSheet("border: 1px solid lightgray;");
-            emptyWidget->setMinimumSize(100, 100); // Set size to match DataItem
+            emptyWidget->setMinimumSize(100, 100);
             layout->addWidget(emptyWidget, gridRow, gridCol);
-            m_dataItems.append(emptyWidget); // Store for cleanup
+            m_dataItems.append(emptyWidget);
         } else {
             // Data item
             DataItem *item = new DataItem(this);
