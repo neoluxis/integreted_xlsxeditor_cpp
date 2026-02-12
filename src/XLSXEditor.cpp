@@ -8,6 +8,8 @@
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QProgressDialog>
+#include <unordered_map>
+#include <fstream>
 
 using namespace cc::neolux::fem::xlsxeditor;
 
@@ -120,8 +122,22 @@ void XLSXEditor::loadData(QProgressDialog &progress)
     int startRow, startCol, endRow, endCol;
     parseRange(m_range, startRow, startCol, endRow, endCol);
 
+    // Get all pictures in the sheet
+    auto allPictures = m_wrapper->fetchAllPicturesInSheet(m_sheetName.toStdString());
+    std::string tempDir = m_wrapper->getTempDir();
+
+    int totalCells = (endRow - startRow + 1) * (endCol - startCol + 1);
+    progress.setMaximum(totalCells);
+
     int current = 0;
-    // For each cell in range, check if it has picture
+    // Create a map for quick lookup of pictures by cell ref
+    std::unordered_map<std::string, cc::neolux::utils::MiniXLSX::SheetPicture> picMap;
+    for (const auto &pic : allPictures) {
+        std::string ref = pic.col + pic.row;
+        picMap[ref] = pic;
+    }
+
+    // For each cell in range
     for (int row = startRow; row <= endRow; ++row) {
         for (int col = startCol; col <= endCol; ++col) {
             progress.setValue(++current);
@@ -129,15 +145,22 @@ void XLSXEditor::loadData(QProgressDialog &progress)
                 return;
             }
             QString cellRef = numToCol(col) + QString::number(row);
-            auto rawOpt = m_wrapper->getPictureRaw(static_cast<unsigned int>(m_sheetIndex), cellRef.toStdString());
-            if (rawOpt.has_value()) {
-                const std::vector<uint8_t> &bytes = rawOpt.value();
-                QImage image = QImage::fromData(bytes.data(), bytes.size());
-                // Get description from cell below
-                QString descCell = numToCol(col) + QString::number(row + 1);
-                auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString());
-                QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
-                m_data.append({row, col, image, desc, false});
+            auto it = picMap.find(cellRef.toStdString());
+            if (it != picMap.end()) {
+                // Load image from file
+                std::string imagePath = tempDir + "/xl/" + it->second.relativePath;
+                std::ifstream file(imagePath, std::ios::binary);
+                if (file) {
+                    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+                    QImage image = QImage::fromData(bytes.data(), bytes.size());
+                    // Get description from cell below
+                    QString descCell = numToCol(col) + QString::number(row + 1);
+                    auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString());
+                    QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
+                    m_data.append({row, col, image, desc, false});
+                } else {
+                    m_data.append({row, col, QImage(), "", false});
+                }
             } else {
                 m_data.append({row, col, QImage(), "", false});
             }
@@ -169,7 +192,7 @@ void XLSXEditor::displayData()
             item->setDescription(entry.desc);
             item->setDeleted(entry.deleted);
             item->setRowCol(entry.row, entry.col);
-            int gridRow = (entry.row - startRow) / 2; // Compress rows, assuming picture rows are every other row
+            int gridRow = entry.row - startRow;
             int gridCol = entry.col - startCol;
             layout->addWidget(item, gridRow, gridCol);
             connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {

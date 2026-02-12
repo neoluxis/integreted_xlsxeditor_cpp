@@ -9,7 +9,7 @@
         <translation>DataItem</translation>
     </message>
     <message>
-        <location filename="../src/DataItem.ui" line="24"/>
+        <location filename="../src/DataItem.ui" line="42"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
@@ -23,38 +23,38 @@
     </message>
     <message>
         <location filename="../src/XLSXEditor.ui" line="22"/>
-        <location filename="../src/XLSXEditor.cpp" line="198"/>
+        <location filename="../src/XLSXEditor.cpp" line="216"/>
         <source>Restore</source>
         <translation>恢复</translation>
     </message>
     <message>
         <location filename="../src/XLSXEditor.ui" line="29"/>
-        <location filename="../src/XLSXEditor.cpp" line="192"/>
+        <location filename="../src/XLSXEditor.cpp" line="210"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="69"/>
+        <location filename="../src/XLSXEditor.cpp" line="73"/>
         <source>Loading data...</source>
         <translation>加载数据中...</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="69"/>
+        <location filename="../src/XLSXEditor.cpp" line="73"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="192"/>
+        <location filename="../src/XLSXEditor.cpp" line="210"/>
         <source>Data saved to XLSX.</source>
         <translation>数据已保存到XLSX。</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="198"/>
+        <location filename="../src/XLSXEditor.cpp" line="216"/>
         <source>Data restored.</source>
         <translation>数据已恢复。</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="223"/>
+        <location filename="../src/XLSXEditor.cpp" line="241"/>
         <source>Image Preview</source>
         <translation>图片预览</translation>
     </message>
