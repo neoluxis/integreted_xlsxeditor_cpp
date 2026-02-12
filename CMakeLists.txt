@@ -7,6 +7,8 @@ set(CMAKE_BUILD_TYPE Debug)
 
 message("Integrated XLSX editor in femapp")
 
+option(XLSXED_BUILD_APP "Build a sample app of xlsx editor" OFF)
+
 # Find Qt6
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets LinguistTools Concurrent)
 
@@ -39,12 +41,6 @@ set(WIDGET_SRC
     ${UI_HEADERS}
 )
 
-# For testing, if main.cpp exists
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
-    set(EXE_SRC
-        src/main.cpp
-    )
-endif()
 
 # Create library
 add_library(XLSXEditor SHARED ${WIDGET_SRC})
@@ -83,9 +79,12 @@ add_custom_target(compile_translations_XLSXEditor
     COMMENT "Compile Qt translation files for XLSXEditor (.qm)"
 )
 
-# If building exe for testing
-if(EXE_SRC)
+if(XLSXED_BUILD_APP)
+    set(EXE_SRC
+        src/main.cpp
+    ) 
+    # If building exe for testing
     add_executable(XLSXEditor_test ${EXE_SRC})
     target_link_libraries(XLSXEditor_test PRIVATE XLSXEditor)
-endif()
 
+endif(XLSXED_BUILD_APP)
