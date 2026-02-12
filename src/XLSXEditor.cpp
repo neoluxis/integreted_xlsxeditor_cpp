@@ -388,6 +388,7 @@ void XLSXEditor::showImageDialog(int row, int col)
 
 void XLSXEditor::restoreData()
 {
+    // 从内存中恢复dirty的item，不保存到文件
     for (const QString &key : std::as_const(m_dirtyCells)) {
         auto indexIt = m_indexByCell.find(key);
         if (indexIt == m_indexByCell.end()) {
@@ -398,18 +399,9 @@ void XLSXEditor::restoreData()
 
         auto itemIt = m_itemByCell.find(key);
         if (itemIt != m_itemByCell.end() && itemIt.value()) {
-            itemIt.value()->setDescription(m_data[index].desc);
             itemIt.value()->setDeleted(false);
         }
-
-        QString picCell = numToCol(m_data[index].col) + QString::number(m_data[index].row);
-        QString descCell = numToCol(m_data[index].col) + QString::number(m_data[index].row + 1);
-        cc::neolux::utils::MiniXLSX::CellStyle cs;
-        cs.backgroundColor = "";
-        m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(), "");
-        m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(), cs);
     }
-    m_wrapper->save();
     m_dirtyCells.clear();
 }
 

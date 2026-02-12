@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>292</width>
-    <height>379</height>
+    <width>186</width>
+    <height>268</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -38,13 +38,26 @@
    </item>
    <item row="0" column="1">
     <widget class="QPushButton" name="btnMarkDel">
+     <property name="maximumSize">
+      <size>
+       <width>120</width>
+       <height>16777215</height>
+      </size>
+     </property>
      <property name="text">
       <string>Delete</string>
      </property>
     </widget>
    </item>
    <item row="3" column="1">
-    <widget class="QLineEdit" name="lnData"/>
+    <widget class="QLineEdit" name="lnData">
+     <property name="maximumSize">
+      <size>
+       <width>120</width>
+       <height>16777215</height>
+      </size>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
