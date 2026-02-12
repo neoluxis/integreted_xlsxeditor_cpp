@@ -3,7 +3,7 @@
 #include <QWidget>
 #include <QString>
 #include <QVector>
-#include <QProgressDialog>
+#include <QProgressBar>
 #include <QImage>
 #include <QHash>
 #include <QSet>
@@ -59,7 +59,7 @@ private:
 
     void parseRange(const QString &range, int &startRow, int &startCol, int &endRow, int &endCol);
     void loadData();
-    void loadData(QProgressDialog &progress);
+    void loadData(QProgressBar &progressBar);
     void displayData();
     bool saveData();
     void restoreData();
@@ -67,6 +67,8 @@ private:
     QString numToCol(int num);
     QString cellKey(int row, int col) const;
     void showImageDialog(int row, int col);
+    void clearDataItems();
+    void resetState();
 };
 
 } // 命名空间 xlsxeditor

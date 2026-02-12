@@ -47,7 +47,7 @@ QString DataItem::getDescription() const
 void DataItem::setDeleted(bool deleted)
 {
     m_deleted = deleted;
-    qInfo() << "DataItem setDeleted" << deleted << "row" << m_row << "col" << m_col;
+    // qInfo() << "DataItem setDeleted" << deleted << "row" << m_row << "col" << m_col;
     if (deleted) {
         ui->btnMarkDel->setText(tr("Restore"));
         // 待办：XLSX 中写入红色背景；UI 仅调整样式

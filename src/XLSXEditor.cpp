@@ -7,8 +7,9 @@
 #include <QDialog>
 #include <QLabel>
 #include <QVBoxLayout>
-#include <QProgressDialog>
+#include <QProgressBar>
 #include <QCoreApplication>
+#include <QTimer>
 #include <QDebug>
 #include <fstream>
 #include <utility>
@@ -38,6 +39,7 @@ XLSXEditor::XLSXEditor(QWidget *parent) :
     m_sheetIndex(-1)
 {
     ui->setupUi(this);
+    ui->progressBar->setVisible(false);
 }
 
 QString XLSXEditor::cellKey(int row, int col) const
@@ -47,6 +49,7 @@ QString XLSXEditor::cellKey(int row, int col) const
 
 XLSXEditor::~XLSXEditor()
 {
+    clearDataItems();
     delete ui;
     if (m_wrapper) {
         m_wrapper->close();
@@ -55,33 +58,26 @@ XLSXEditor::~XLSXEditor()
     if (m_pictureReader.isOpen()) {
         m_pictureReader.close();
     }
-    for (auto item : m_dataItems) {
-        delete item;
-    }
 }
 
 void XLSXEditor::loadXLSX(const QString &filePath, const QString &sheetName, const QString &range)
 {
+    resetState();
     m_filePath = filePath;
     m_sheetName = sheetName;
     m_range = range;
 
-    if (m_wrapper) {
-        m_wrapper->close();
-        delete m_wrapper;
-    }
-    if (m_pictureReader.isOpen()) {
-        m_pictureReader.close();
-    }
     m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
     if (!m_wrapper->open(filePath.toStdString())) {
         QMessageBox::critical(this, tr("Error"), tr("Failed to open XLSX file."));
+        ui->progressBar->setVisible(false);
         return;
     }
 
     if (!m_pictureReader.open(filePath.toStdString())) {
         QMessageBox::critical(this, tr("Error"), tr("Failed to prepare picture reader."));
         m_wrapper->close();
+        ui->progressBar->setVisible(false);
         return;
     }
 
@@ -95,6 +91,7 @@ void XLSXEditor::loadXLSX(const QString &filePath, const QString &sheetName, con
     }
     if (m_sheetIndex < 0) {
         QMessageBox::critical(this, tr("Error"), tr("Sheet not found: %1").arg(sheetName));
+        ui->progressBar->setVisible(false);
         return;
     }
 
@@ -103,14 +100,15 @@ void XLSXEditor::loadXLSX(const QString &filePath, const QString &sheetName, con
     parseRange(m_range, startRow, startCol, endRow, endCol);
     int totalCells = (endRow - startRow + 1) * (endCol - startCol + 1);
 
-    QProgressDialog progress(tr("Loading data..."), tr("Cancel"), 0, totalCells, this);
-    progress.setWindowModality(Qt::WindowModal);
-    progress.setMinimumDuration(0);
-    progress.show();
+    ui->progressBar->setMinimum(0);
+    ui->progressBar->setMaximum(totalCells);
+    ui->progressBar->setValue(0);
+    ui->progressBar->setVisible(true);
     QCoreApplication::processEvents();
 
-    loadData(progress);
+    loadData(*ui->progressBar);
     displayData();
+    ui->progressBar->setVisible(false);
 }
 
 void XLSXEditor::parseRange(const QString &range, int &startRow, int &startCol, int &endRow, int &endCol)
@@ -184,7 +182,7 @@ QString XLSXEditor::numToCol(int num)
     return col;
 }
 
-void XLSXEditor::loadData(QProgressDialog &progress)
+void XLSXEditor::loadData(QProgressBar &progressBar)
 {
     m_data.clear();
     m_indexByCell.clear();
@@ -197,7 +195,8 @@ void XLSXEditor::loadData(QProgressDialog &progress)
     auto allPictures = m_pictureReader.getSheetPictures(static_cast<unsigned int>(m_sheetIndex));
     std::string tempDir = m_pictureReader.getTempDir();
     if (tempDir.empty()) {
-        QMessageBox::critical(this, tr("Error"), tr("Failed to extract XLSX temporary files."));
+        qWarning() << "Failed to extract XLSX temporary files.";
+        progressBar.setVisible(false);
         return;
     }
 
@@ -210,7 +209,7 @@ void XLSXEditor::loadData(QProgressDialog &progress)
     }
     qInfo() << "loadData totalPictures" << totalPictures
             << "range" << startRow << startCol << endRow << endCol;
-    progress.setMaximum(totalPictures);
+    progressBar.setMaximum(totalPictures);
 
     int current = 0;
     for (const auto &pic : allPictures) {
@@ -219,10 +218,8 @@ void XLSXEditor::loadData(QProgressDialog &progress)
             continue;
         }
 
-        progress.setValue(++current);
-        if (progress.wasCanceled()) {
-            return;
-        }
+        progressBar.setValue(++current);
+        QCoreApplication::processEvents();
 
         std::string imagePath = tempDir + "/xl/" + pic.relativePath;
         std::ifstream file(imagePath, std::ios::binary);
@@ -231,10 +228,11 @@ void XLSXEditor::loadData(QProgressDialog &progress)
             std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
             image = QImage::fromData(bytes.data(), bytes.size());
             if (image.isNull()) {
-                QMessageBox::warning(this, tr("Warning"), tr("Failed to load image from %1").arg(QString::fromStdString(imagePath)));
+                // QMessageBox::warning(this, tr("Warning"), tr("Failed to load image from %1").arg(QString::fromStdString(imagePath)));
+                qWarning() << "Failed to load image from" << QString::fromStdString(imagePath);
             }
         } else {
-            QMessageBox::warning(this, tr("Warning"), tr("Image file not found: %1").arg(QString::fromStdString(imagePath)));
+            qWarning() << "Image file not found:" << QString::fromStdString(imagePath);
         }
 
         QString descCell = numToCol(pic.colNum) + QString::number(pic.rowNum + 1);
@@ -245,15 +243,44 @@ void XLSXEditor::loadData(QProgressDialog &progress)
     }
 }
 
-void XLSXEditor::displayData()
+void XLSXEditor::clearDataItems()
 {
-    // 清理旧组件
+    if (!ui) {
+        return;
+    }
     for (auto item : m_dataItems) {
         ui->gridData->removeWidget(item);
         delete item;
     }
     m_dataItems.clear();
     m_itemByCell.clear();
+}
+
+void XLSXEditor::resetState()
+{
+    clearDataItems();
+    m_data.clear();
+    m_indexByCell.clear();
+    m_dirtyCells.clear();
+    m_sheetIndex = -1;
+    if (m_wrapper) {
+        m_wrapper->close();
+        delete m_wrapper;
+        m_wrapper = nullptr;
+    }
+    if (m_pictureReader.isOpen()) {
+        m_pictureReader.close();
+    }
+    if (ui && ui->progressBar) {
+        ui->progressBar->setValue(0);
+        ui->progressBar->setVisible(false);
+    }
+}
+
+void XLSXEditor::displayData()
+{
+    // 清理旧组件
+    clearDataItems();
 
     int startRow, startCol, endRow, endCol;
     parseRange(m_range, startRow, startCol, endRow, endCol);
