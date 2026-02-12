@@ -2,6 +2,7 @@
 #include "ui_DataItem.h"
 #include <QPixmap>
 #include <QLabel>
+#include <QDebug>
 
 using namespace cc::neolux::fem::xlsxeditor;
 
@@ -14,8 +15,8 @@ DataItem::DataItem(QWidget *parent) :
 {
     ui->setupUi(this);
     setStyleSheet("border: 2px solid gray;");
-    connect(ui->btnMarkDel, &QPushButton::clicked, this, &DataItem::on_btnMarkDel_clicked);
-    connect(ui->btnImage, &QPushButton::clicked, this, [this]() { emit imageClicked(m_row, m_col); });
+    connect(ui->btnImage, &QPushButton::pressed, this, [this]() { emit imageClicked(m_row, m_col); });
+    ui->lnData->setReadOnly(true); // 数据只读，防止误修改
 }
 
 DataItem::~DataItem()
@@ -46,16 +47,13 @@ QString DataItem::getDescription() const
 void DataItem::setDeleted(bool deleted)
 {
     m_deleted = deleted;
+    qInfo() << "DataItem setDeleted" << deleted << "row" << m_row << "col" << m_col;
     if (deleted) {
-        ui->lnData->setText("[Deleted] " + ui->lnData->text());
-        // TODO: set background color to red for XLSX, but for UI, maybe change style
+        ui->btnMarkDel->setText(tr("Restore"));
+        // 待办：XLSX 中写入红色背景；UI 仅调整样式
         ui->lnData->setStyleSheet("background-color: red;");
     } else {
-        QString text = ui->lnData->text();
-        if (text.startsWith("[Deleted] ")) {
-            text = text.mid(10);
-        }
-        ui->lnData->setText(text);
+        ui->btnMarkDel->setText(tr("Delete"));
         ui->lnData->setStyleSheet("");
     }
 }
@@ -83,6 +81,7 @@ int DataItem::getCol() const
 
 void DataItem::on_btnMarkDel_clicked()
 {
+    qInfo() << "DataItem delete clicked" << "row" << m_row << "col" << m_col;
     setDeleted(!m_deleted);
     emit deleteToggled(m_deleted);
 }

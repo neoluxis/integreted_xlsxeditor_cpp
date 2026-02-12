@@ -23,13 +23,13 @@
     </message>
     <message>
         <location filename="../src/XLSXEditor.ui" line="22"/>
-        <location filename="../src/XLSXEditor.cpp" line="216"/>
+        <location filename="../src/XLSXEditor.cpp" line="227"/>
         <source>Restore</source>
         <translation>恢复</translation>
     </message>
     <message>
         <location filename="../src/XLSXEditor.ui" line="29"/>
-        <location filename="../src/XLSXEditor.cpp" line="210"/>
+        <location filename="../src/XLSXEditor.cpp" line="218"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -44,17 +44,53 @@
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="210"/>
+        <location filename="../src/XLSXEditor.cpp" line="129"/>
+        <source>Error</source>
+        <translation>错误</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="129"/>
+        <source>Failed to extract XLSX temporary files.</source>
+        <translation>解压XLSX临时文件失败。</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="161"/>
+        <location filename="../src/XLSXEditor.cpp" line="169"/>
+        <source>Warning</source>
+        <translation>警告</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="161"/>
+        <source>Failed to load image from %1</source>
+        <translation>从%1加载图片失败</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="169"/>
+        <source>Image file not found: %1</source>
+        <translation>图片文件未找到：%1</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="218"/>
         <source>Data saved to XLSX.</source>
         <translation>数据已保存到XLSX。</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="216"/>
+        <location filename="../src/XLSXEditor.cpp" line="220"/>
+        <source>Save Error</source>
+        <translation>保存错误</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="220"/>
+        <source>Failed to save data to XLSX.</source>
+        <translation>保存数据到XLSX失败。</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="227"/>
         <source>Data restored.</source>
         <translation>数据已恢复。</translation>
     </message>
     <message>
-        <location filename="../src/XLSXEditor.cpp" line="241"/>
+        <location filename="../src/XLSXEditor.cpp" line="258"/>
         <source>Image Preview</source>
         <translation>图片预览</translation>
     </message>

@@ -4,7 +4,11 @@
 #include <QString>
 #include <QVector>
 #include <QProgressDialog>
+#include <QImage>
+#include <QHash>
+#include <QSet>
 #include <cc/neolux/utils/MiniXLSX/OpenXLSXWrapper.hpp>
+#include <cc/neolux/utils/MiniXLSX/XLPictureReader.hpp>
 
 namespace Ui {
 class XLSXEditor;
@@ -44,23 +48,28 @@ private:
     QString m_filePath;
     QString m_sheetName;
     QString m_range;
-    QVector<DataEntry> m_data; // image and description with position
+    QVector<DataEntry> m_data; // 图片与描述及其位置
     QVector<DataItem*> m_dataItems;
+    QHash<QString, int> m_indexByCell;
+    QHash<QString, DataItem*> m_itemByCell;
+    QSet<QString> m_dirtyCells;
     cc::neolux::utils::MiniXLSX::OpenXLSXWrapper *m_wrapper;
+    cc::neolux::utils::MiniXLSX::XLPictureReader m_pictureReader;
     int m_sheetIndex;
 
     void parseRange(const QString &range, int &startRow, int &startCol, int &endRow, int &endCol);
     void loadData();
     void loadData(QProgressDialog &progress);
     void displayData();
-    void saveData();
+    bool saveData();
     void restoreData();
     int colToNum(const QString &col);
     QString numToCol(int num);
+    QString cellKey(int row, int col) const;
     void showImageDialog(int row, int col);
 };
 
-} // namespace xlsxeditor
-} // namespace fem
-} // namespace neolux
-} // namespace cc
+} // 命名空间 xlsxeditor
+} // 命名空间 fem
+} // 命名空间 neolux
+} // 命名空间 cc
