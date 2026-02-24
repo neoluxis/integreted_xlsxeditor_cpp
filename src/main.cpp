@@ -1,13 +1,13 @@
 #include <QApplication>
 #include <QMainWindow>
-#include <QTranslator>
 #include <QTimer>
+#include <QTranslator>
+
 #include "cc/neolux/fem/xlsxeditor/XLSXEditor.hpp"
 
 using namespace cc::neolux::fem::xlsxeditor;
 
-int main(int argc, char *argv[]) {
-
+int main(int argc, char* argv[]) {
     if (argc < 2) {
         qWarning("Usage: %s <xlsx-file>", argv[0]);
         return -1;
@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
 
     // For testing, create a main window and embed XLSXEditor
     QMainWindow window;
-    XLSXEditor *editor = new XLSXEditor(&window);
+    XLSXEditor* editor = new XLSXEditor(&window);
     window.setCentralWidget(editor);
     window.resize(1024, 768);
     window.show();

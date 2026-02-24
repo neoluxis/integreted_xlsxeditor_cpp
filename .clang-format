@@ -1,0 +1,40 @@
+Language: Cpp
+BasedOnStyle: Google
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignOperands: true
+AllowShortFunctionsOnASingleLine: Inline
+# 每一行的最大长度，建议 100 或 120
+ColumnLimit: 100
+IndentWidth: 4
+ContinuationIndentWidth: 4
+# 针对 Eigen 矩阵初始化的特殊处理
+# 防止类似 matrix << 1, 0, 0, 1; 被强制换行
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackArguments: true
+BinPackParameters: true
+
+# 大括号风格
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+
+# 排序 Include 头文件
+SortIncludes: true
+IncludeCategories:
+  - Regex: '^<Eigen/.*'
+    Priority: 2
+  - Regex: '^<onnxruntime/.*'
+    Priority: 3
+  - Regex: '^<.*'
+    Priority: 1

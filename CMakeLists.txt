@@ -82,7 +82,7 @@ add_custom_target(compile_translations_XLSXEditor
 if(XLSXED_BUILD_APP)
     set(EXE_SRC
         src/main.cpp
-    ) 
+    )
     # If building exe for testing
     add_executable(XLSXEditor_test ${EXE_SRC})
     target_link_libraries(XLSXEditor_test PRIVATE XLSXEditor)

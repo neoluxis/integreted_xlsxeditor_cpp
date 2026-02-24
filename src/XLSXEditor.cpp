@@ -1,22 +1,23 @@
 #include "cc/neolux/fem/xlsxeditor/XLSXEditor.hpp"
-#include "cc/neolux/fem/xlsxeditor/DataItem.hpp"
-#include "ui_XLSXEditor.h"
-#include <QGridLayout>
-#include <QMessageBox>
-#include <QFile>
-#include <QDialog>
-#include <QLabel>
-#include <QVBoxLayout>
-#include <QProgressBar>
+
 #include <QCoreApplication>
-#include <QTimer>
 #include <QDebug>
+#include <QDialog>
+#include <QFile>
+#include <QGridLayout>
+#include <QLabel>
+#include <QMessageBox>
+#include <QProgressBar>
+#include <QTimer>
+#include <QVBoxLayout>
 #include <fstream>
 #include <utility>
 
+#include "cc/neolux/fem/xlsxeditor/DataItem.hpp"
+#include "ui_XLSXEditor.h"
+
 namespace {
-bool splitCellRef(const QString &ref, QString &colPart, QString &rowPart)
-{
+bool splitCellRef(const QString& ref, QString& colPart, QString& rowPart) {
     colPart.clear();
     rowPart.clear();
     for (QChar c : ref.trimmed()) {
@@ -28,27 +29,21 @@ bool splitCellRef(const QString &ref, QString &colPart, QString &rowPart)
     }
     return !colPart.isEmpty() && !rowPart.isEmpty();
 }
-}
+}  // namespace
 
 using namespace cc::neolux::fem::xlsxeditor;
 
-XLSXEditor::XLSXEditor(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::XLSXEditor),
-    m_wrapper(nullptr),
-    m_sheetIndex(-1)
-{
+XLSXEditor::XLSXEditor(QWidget* parent)
+    : QWidget(parent), ui(new Ui::XLSXEditor), m_wrapper(nullptr), m_sheetIndex(-1) {
     ui->setupUi(this);
     ui->progressBar->setVisible(false);
 }
 
-QString XLSXEditor::cellKey(int row, int col) const
-{
+QString XLSXEditor::cellKey(int row, int col) const {
     return QString::number(row) + QLatin1Char(':') + QString::number(col);
 }
 
-XLSXEditor::~XLSXEditor()
-{
+XLSXEditor::~XLSXEditor() {
     clearDataItems();
     delete ui;
     if (m_wrapper) {
@@ -60,8 +55,7 @@ XLSXEditor::~XLSXEditor()
     }
 }
 
-void XLSXEditor::loadXLSX(const QString &filePath, const QString &sheetName, const QString &range)
-{
+void XLSXEditor::loadXLSX(const QString& filePath, const QString& sheetName, const QString& range) {
     resetState();
     m_filePath = filePath;
     m_sheetName = sheetName;
@@ -111,8 +105,8 @@ void XLSXEditor::loadXLSX(const QString &filePath, const QString &sheetName, con
     ui->progressBar->setVisible(false);
 }
 
-void XLSXEditor::parseRange(const QString &range, int &startRow, int &startCol, int &endRow, int &endCol)
-{
+void XLSXEditor::parseRange(const QString& range, int& startRow, int& startCol, int& endRow,
+                            int& endCol) {
     startRow = 0;
     startCol = 0;
     endRow = 0;
@@ -162,8 +156,7 @@ void XLSXEditor::parseRange(const QString &range, int &startRow, int &startCol, 
     }
 }
 
-int XLSXEditor::colToNum(const QString &col)
-{
+int XLSXEditor::colToNum(const QString& col) {
     int num = 0;
     for (QChar c : col) {
         num = num * 26 + (c.toUpper().unicode() - 'A' + 1);
@@ -171,8 +164,7 @@ int XLSXEditor::colToNum(const QString &col)
     return num;
 }
 
-QString XLSXEditor::numToCol(int num)
-{
+QString XLSXEditor::numToCol(int num) {
     QString col;
     while (num > 0) {
         num--;
@@ -182,8 +174,7 @@ QString XLSXEditor::numToCol(int num)
     return col;
 }
 
-void XLSXEditor::loadData(QProgressBar &progressBar)
-{
+void XLSXEditor::loadData(QProgressBar& progressBar) {
     m_data.clear();
     m_indexByCell.clear();
     m_itemByCell.clear();
@@ -201,20 +192,20 @@ void XLSXEditor::loadData(QProgressBar &progressBar)
     }
 
     int totalPictures = 0;
-    for (const auto &pic : allPictures) {
-        if (pic.rowNum >= startRow && pic.rowNum <= endRow &&
-            pic.colNum >= startCol && pic.colNum <= endCol) {
+    for (const auto& pic : allPictures) {
+        if (pic.rowNum >= startRow && pic.rowNum <= endRow && pic.colNum >= startCol &&
+            pic.colNum <= endCol) {
             ++totalPictures;
         }
     }
-    qInfo() << "loadData totalPictures" << totalPictures
-            << "range" << startRow << startCol << endRow << endCol;
+    qInfo() << "loadData totalPictures" << totalPictures << "range" << startRow << startCol
+            << endRow << endCol;
     progressBar.setMaximum(totalPictures);
 
     int current = 0;
-    for (const auto &pic : allPictures) {
-        if (pic.rowNum < startRow || pic.rowNum > endRow ||
-            pic.colNum < startCol || pic.colNum > endCol) {
+    for (const auto& pic : allPictures) {
+        if (pic.rowNum < startRow || pic.rowNum > endRow || pic.colNum < startCol ||
+            pic.colNum > endCol) {
             continue;
         }
 
@@ -225,10 +216,12 @@ void XLSXEditor::loadData(QProgressBar &progressBar)
         std::ifstream file(imagePath, std::ios::binary);
         QImage image;
         if (file) {
-            std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),
+                                       std::istreambuf_iterator<char>());
             image = QImage::fromData(bytes.data(), bytes.size());
             if (image.isNull()) {
-                // QMessageBox::warning(this, tr("Warning"), tr("Failed to load image from %1").arg(QString::fromStdString(imagePath)));
+                // QMessageBox::warning(this, tr("Warning"), tr("Failed to load image from
+                // %1").arg(QString::fromStdString(imagePath)));
                 qWarning() << "Failed to load image from" << QString::fromStdString(imagePath);
             }
         } else {
@@ -236,15 +229,15 @@ void XLSXEditor::loadData(QProgressBar &progressBar)
         }
 
         QString descCell = numToCol(pic.colNum) + QString::number(pic.rowNum + 1);
-        auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString());
+        auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex),
+                                               descCell.toStdString());
         QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
         m_data.append({pic.rowNum, pic.colNum, image, desc, false});
         m_indexByCell.insert(cellKey(pic.rowNum, pic.colNum), m_data.size() - 1);
     }
 }
 
-void XLSXEditor::clearDataItems()
-{
+void XLSXEditor::clearDataItems() {
     if (!ui) {
         return;
     }
@@ -256,8 +249,7 @@ void XLSXEditor::clearDataItems()
     m_itemByCell.clear();
 }
 
-void XLSXEditor::resetState()
-{
+void XLSXEditor::resetState() {
     clearDataItems();
     m_data.clear();
     m_indexByCell.clear();
@@ -277,22 +269,21 @@ void XLSXEditor::resetState()
     }
 }
 
-void XLSXEditor::displayData()
-{
+void XLSXEditor::displayData() {
     // 清理旧组件
     clearDataItems();
 
     int startRow, startCol, endRow, endCol;
     parseRange(m_range, startRow, startCol, endRow, endCol);
 
-    QGridLayout *layout = ui->gridData;
+    QGridLayout* layout = ui->gridData;
     layout->setSpacing(0);
     layout->setContentsMargins(0, 0, 0, 0);
 
     for (int i = 0; i < m_data.size(); ++i) {
-        const auto &entry = m_data[i];
+        const auto& entry = m_data[i];
         if (!entry.image.isNull()) {
-            DataItem *item = new DataItem(this);
+            DataItem* item = new DataItem(this);
             item->setImage(entry.image);
             item->setDescription(entry.desc);
             item->setDeleted(entry.deleted);
@@ -311,8 +302,7 @@ void XLSXEditor::displayData()
     }
 }
 
-void XLSXEditor::on_btnSave_clicked()
-{
+void XLSXEditor::on_btnSave_clicked() {
     if (saveData()) {
         QMessageBox::information(this, tr("Save"), tr("Data saved to XLSX."));
     } else {
@@ -320,27 +310,28 @@ void XLSXEditor::on_btnSave_clicked()
     }
 }
 
-void XLSXEditor::on_btnRestore_clicked()
-{
+void XLSXEditor::on_btnRestore_clicked() {
     restoreData();
     QMessageBox::information(this, tr("Restore"), tr("Data restored."));
 }
 
-bool XLSXEditor::saveData()
-{
+bool XLSXEditor::saveData() {
     // 方案一：全量覆盖保存（当前使用）
     // 保存时覆盖所有数据点的标记状态
-    for (const auto &entry : m_data) {
+    for (const auto& entry : m_data) {
         QString picCell = numToCol(entry.col) + QString::number(entry.row);
         QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
         cc::neolux::utils::MiniXLSX::CellStyle cs;
         cs.backgroundColor = entry.deleted ? "#FF0000" : "";
         if (entry.deleted) {
-            m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(), "[D]");
+            m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(),
+                                    "[D]");
         } else {
-            m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(), "");
+            m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(),
+                                    "");
         }
-        m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(), cs);
+        m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+                                cs);
     }
 
     // 方案二：仅保存有变更的单元格（备用）
@@ -355,11 +346,14 @@ bool XLSXEditor::saveData()
     //     cc::neolux::utils::MiniXLSX::CellStyle cs;
     //     cs.backgroundColor = entry.deleted ? "#FF0000" : "";
     //     if (entry.deleted) {
-    //         m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(), "[D]");
+    //         m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex),
+    //         picCell.toStdString(), "[D]");
     //     } else {
-    //         m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(), "");
+    //         m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex),
+    //         picCell.toStdString(), "");
     //     }
-    //     m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(), cs);
+    //     m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+    //     cs);
     // }
 
     bool saved = m_wrapper->save();
@@ -369,15 +363,14 @@ bool XLSXEditor::saveData()
     return saved;
 }
 
-void XLSXEditor::showImageDialog(int row, int col)
-{
-    for (const auto &entry : m_data) {
+void XLSXEditor::showImageDialog(int row, int col) {
+    for (const auto& entry : m_data) {
         if (entry.row == row && entry.col == col && !entry.image.isNull()) {
             QDialog dialog(this);
             dialog.setWindowTitle(tr("Image Preview"));
-            QLabel *label = new QLabel(&dialog);
+            QLabel* label = new QLabel(&dialog);
             label->setPixmap(QPixmap::fromImage(entry.image));
-            QVBoxLayout *layout = new QVBoxLayout(&dialog);
+            QVBoxLayout* layout = new QVBoxLayout(&dialog);
             layout->addWidget(label);
             dialog.setLayout(layout);
             dialog.exec();
@@ -386,10 +379,9 @@ void XLSXEditor::showImageDialog(int row, int col)
     }
 }
 
-void XLSXEditor::restoreData()
-{
+void XLSXEditor::restoreData() {
     // 从内存中恢复dirty的item，不保存到文件
-    for (const QString &key : std::as_const(m_dirtyCells)) {
+    for (const QString& key : std::as_const(m_dirtyCells)) {
         auto indexIt = m_indexByCell.find(key);
         if (indexIt == m_indexByCell.end()) {
             continue;
@@ -404,5 +396,3 @@ void XLSXEditor::restoreData()
     }
     m_dirtyCells.clear();
 }
-
-

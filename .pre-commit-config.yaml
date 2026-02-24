@@ -1,0 +1,32 @@
+repos:
+  # 1. 基础检查：检查空行、文件结尾、修复中文字符集等
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  # 2. C++/C 格式化
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v21.1.8
+    hooks:
+      - id: clang-format
+        # 指定处理的文件后缀
+        # types_or: [c++, c, objc, objcpp, cuda, header]
+        files: \.(h|cpp|hpp|c|cc|cxx)$
+
+  # 3. Python 格式化 (Black)
+  - repo: https://github.com/psf/black
+    rev: 26.1.0
+    hooks:
+      - id: black
+        files: \.py$
+
+  # 4. Python 导入语句排序
+  - repo: https://github.com/pycqa/isort
+    rev: 8.0.0
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]

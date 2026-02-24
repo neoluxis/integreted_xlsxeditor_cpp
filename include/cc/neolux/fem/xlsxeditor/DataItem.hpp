@@ -1,8 +1,8 @@
 #pragma once
 
-#include <QWidget>
 #include <QImage>
 #include <QString>
+#include <QWidget>
 
 namespace Ui {
 class DataItem;
@@ -13,16 +13,15 @@ namespace neolux {
 namespace fem {
 namespace xlsxeditor {
 
-class DataItem : public QWidget
-{
+class DataItem : public QWidget {
     Q_OBJECT
 
 public:
-    explicit DataItem(QWidget *parent = nullptr);
+    explicit DataItem(QWidget* parent = nullptr);
     ~DataItem();
 
-    void setImage(const QImage &image);
-    void setDescription(const QString &desc);
+    void setImage(const QImage& image);
+    void setDescription(const QString& desc);
     QString getDescription() const;
     void setDeleted(bool deleted);
     bool isDeleted() const;
@@ -39,12 +38,12 @@ private slots:
     void on_btnMarkDel_clicked();
 
 private:
-    Ui::DataItem *ui;
+    Ui::DataItem* ui;
     bool m_deleted;
     int m_row, m_col;
 };
 
-} // 命名空间 xlsxeditor
-} // 命名空间 fem
-} // 命名空间 neolux
-} // 命名空间 cc
+}  // namespace xlsxeditor
+}  // namespace fem
+}  // namespace neolux
+}  // namespace cc

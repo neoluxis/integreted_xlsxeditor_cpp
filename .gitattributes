@@ -1,0 +1,16 @@
+# 强制所有文本文件使用 LF (Linux 换行符)
+* text=auto eol=lf
+
+# 明确指定 C++/Python 文件
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.h   text eol=lf
+*.py  text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+
+# 二进制文件（如模型、图像）保持原样
+*.onnx binary
+*.bin binary
+*.jpg binary
+*.png binary
