@@ -27,6 +27,11 @@
         <translation>预览</translation>
     </message>
     <message>
+        <location filename="../src/XLSXEditor.ui" line="29"/>
+        <source>Select All</source>
+        <translation>全选</translation>
+    </message>
+    <message>
         <location filename="../src/XLSXEditor.cpp" line="402"/>
         <source>Show All</source>
         <translation>显示全部</translation>

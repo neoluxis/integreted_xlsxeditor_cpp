@@ -1,5 +1,6 @@
 #include "cc/neolux/fem/xlsxeditor/XLSXEditor.hpp"
 
+#include <QCheckBox>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDialog>
@@ -47,7 +48,8 @@ XLSXEditor::XLSXEditor(QWidget* parent)
       m_wrapper(nullptr),
       m_sheetIndex(-1),
       m_previewOnly(false),
-      m_itemScale(1.0) {
+      m_itemScale(1.0),
+      m_syncingSelectAll(false) {
     ui->setupUi(this);
     ui->progressBar->setVisible(false);
     ui->scrollArea->setWidgetResizable(false);
@@ -287,6 +289,7 @@ void XLSXEditor::resetState() {
         ui->progressBar->setVisible(false);
     }
     syncPreviewButtonText();
+    syncSelectAllState();
 }
 
 void XLSXEditor::displayData(bool previewOnly) {
@@ -322,6 +325,7 @@ void XLSXEditor::displayData(bool previewOnly) {
             m_data[i].deleted = deleted;
             m_dirtyCells.insert(cellKey(m_data[i].row, m_data[i].col));
             syncPreviewVisibility();
+            syncSelectAllState();
         });
         connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
         m_dataItems.append(item);
@@ -329,6 +333,7 @@ void XLSXEditor::displayData(bool previewOnly) {
     }
 
     syncPreviewVisibility();
+    syncSelectAllState();
     updateScrollWidgetSize();
 }
 
@@ -344,6 +349,30 @@ void XLSXEditor::on_btnPreview_clicked() {
     m_previewOnly = !m_previewOnly;
     syncPreviewButtonText();
     syncPreviewVisibility();
+}
+
+void XLSXEditor::on_chkSelectAll_stateChanged(int state) {
+    if (m_syncingSelectAll || m_data.isEmpty()) {
+        return;
+    }
+
+    const bool deleted = (state != Qt::Checked);
+    for (int i = 0; i < m_data.size(); ++i) {
+        if (m_data[i].deleted == deleted) {
+            continue;
+        }
+
+        m_data[i].deleted = deleted;
+        m_dirtyCells.insert(cellKey(m_data[i].row, m_data[i].col));
+
+        auto itemIt = m_itemByCell.find(cellKey(m_data[i].row, m_data[i].col));
+        if (itemIt != m_itemByCell.end() && itemIt.value() != nullptr) {
+            itemIt.value()->setDeleted(deleted);
+        }
+    }
+
+    syncPreviewVisibility();
+    syncSelectAllState();
 }
 
 bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
@@ -465,4 +494,28 @@ void XLSXEditor::syncPreviewVisibility() {
         const bool visible = !m_previewOnly || !entry.deleted;
         itemIt.value()->setVisible(visible);
     }
+}
+
+void XLSXEditor::syncSelectAllState() {
+    if (!ui || !ui->chkSelectAll) {
+        return;
+    }
+
+    m_syncingSelectAll = true;
+    if (m_data.isEmpty()) {
+        ui->chkSelectAll->setCheckState(Qt::Unchecked);
+        m_syncingSelectAll = false;
+        return;
+    }
+
+    int deletedCount = 0;
+    for (const auto& entry : std::as_const(m_data)) {
+        if (entry.deleted) {
+            ++deletedCount;
+        }
+    }
+
+    const bool allKept = (deletedCount == 0);
+    ui->chkSelectAll->setCheckState(allKept ? Qt::Checked : Qt::Unchecked);
+    m_syncingSelectAll = false;
 }

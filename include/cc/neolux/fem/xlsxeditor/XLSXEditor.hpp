@@ -40,6 +40,7 @@ public:
 private slots:
     void on_btnSave_clicked();
     void on_btnPreview_clicked();
+    void on_chkSelectAll_stateChanged(int state);
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -72,8 +73,10 @@ private:
     void updateScrollWidgetSize();
     void syncPreviewButtonText();
     void syncPreviewVisibility();
+    void syncSelectAllState();
     bool m_previewOnly;
     double m_itemScale;
+    bool m_syncingSelectAll;
 };
 
 }  // namespace xlsxeditor
