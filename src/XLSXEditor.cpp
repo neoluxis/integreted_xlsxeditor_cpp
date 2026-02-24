@@ -26,6 +26,8 @@
 #include "cc/neolux/utils/KFZippa/kfzippa.hpp"
 #include "ui_XLSXEditor.h"
 
+#define tr(sourceText) QCoreApplication::translate("XLSXEditor", sourceText)
+
 namespace {
 constexpr int kBaseItemWidth = 70;
 constexpr int kBaseItemHeight = 90;

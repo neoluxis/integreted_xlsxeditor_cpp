@@ -1,5 +1,6 @@
 #include "cc/neolux/fem/xlsxeditor/DataItem.hpp"
 
+#include <QCoreApplication>
 #include <QDebug>
 #include <QEvent>
 #include <QLabel>
@@ -9,6 +10,8 @@
 #include <cmath>
 
 #include "ui_DataItem.h"
+
+#define tr(sourceText) QCoreApplication::translate("DataItem", sourceText)
 
 using namespace cc::neolux::fem::xlsxeditor;
 
