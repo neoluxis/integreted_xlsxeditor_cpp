@@ -231,8 +231,6 @@ void XLSXEditor::loadData(QProgressBar& progressBar) {
             ++totalPictures;
         }
     }
-    qInfo() << "loadData totalPictures" << totalPictures << "range" << startRow << startCol
-            << endRow << endCol;
     progressBar.setMaximum(totalPictures);
 
     int current = 0;
@@ -440,7 +438,8 @@ bool XLSXEditor::saveFakeDelete() {
 }
 
 bool XLSXEditor::saveRealDelete() {
-    // First, save cell modifications through OpenXLSX API
+    // 第 1 阶段：先通过 OpenXLSX 写回描述单元格（清空标记删除项）
+    // 这样可以确保文本与样式修改由上层接口稳定落盘。
     for (const auto& entry : m_data) {
         QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
         cc::neolux::utils::MiniXLSX::CellStyle cs;
@@ -458,14 +457,14 @@ bool XLSXEditor::saveRealDelete() {
         return false;
     }
 
-    // Close OpenXLSX to release the file
+    // 第 2 阶段：关闭 OpenXLSX 句柄，避免后续 XML 文件改写时的占用冲突。
     m_wrapper->close();
     delete m_wrapper;
     m_wrapper = nullptr;
 
     m_pictureReader.close();
 
-    // Now reopen for XML modifications
+    // 第 3 阶段：重新解压文件，准备直接修改 drawing 与关系 XML。
     if (!m_pictureReader.open(m_filePath.toStdString())) {
         return false;
     }
@@ -482,7 +481,7 @@ bool XLSXEditor::saveRealDelete() {
     const fs::path drawingRelsPath =
         drawingPath.parent_path() / "_rels" / (drawingPath.filename().string() + ".rels");
 
-    // If no drawing files exist, just reopen and return
+    // 没有 drawing 文件说明当前表没有图片对象，直接恢复打开状态即可。
     if (!fs::exists(drawingPath) || !fs::exists(drawingRelsPath)) {
         m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
         if (!m_wrapper->open(m_filePath.toStdString())) {
@@ -491,6 +490,7 @@ bool XLSXEditor::saveRealDelete() {
         return true;
     }
 
+    // 收集需要删除的图片坐标（与 drawing 锚点坐标对齐）。
     std::set<std::pair<int, int>> deletedCoords;
     for (const auto& entry : m_data) {
         if (entry.deleted) {
@@ -516,6 +516,7 @@ bool XLSXEditor::saveRealDelete() {
         return false;
     }
 
+    // 第 4 阶段：删除 drawing.xml 中对应图片锚点，记录 embedId。
     std::unordered_set<std::string> removedEmbedIds;
     for (pugi::xml_node anchor = wsDr.first_child(); anchor;) {
         pugi::xml_node nextAnchor = anchor.next_sibling();
@@ -537,7 +538,6 @@ bool XLSXEditor::saveRealDelete() {
                                         .child("a:blip")
                                         .attribute("r:embed")
                                         .as_string();
-        qInfo() << "  -> embedId:" << QString::fromStdString(embedId);
         if (!embedId.empty()) {
             removedEmbedIds.insert(embedId);
         }
@@ -557,6 +557,7 @@ bool XLSXEditor::saveRealDelete() {
         return false;
     }
 
+    // 第 5 阶段：在 drawing rels 中删除 embedId 对应关系并记录图片目标路径。
     std::unordered_set<std::string> removedTargets;
     for (pugi::xml_node rel = relRoot.child("Relationship"); rel;) {
         pugi::xml_node nextRel = rel.next_sibling("Relationship");
@@ -575,6 +576,7 @@ bool XLSXEditor::saveRealDelete() {
         return false;
     }
 
+    // 第 6 阶段：删除已不再被任何关系引用的 media 图片文件。
     std::unordered_set<std::string> activeImageTargets;
     for (pugi::xml_node rel = relRoot.child("Relationship"); rel;
          rel = rel.next_sibling("Relationship")) {
@@ -596,8 +598,8 @@ bool XLSXEditor::saveRealDelete() {
         }
     }
 
-    // Use KFZippa to repack the modified temp directory directly to the original file
-    // IMPORTANT: Don't close m_pictureReader yet! We still need the temp directory
+    // 第 7 阶段：将修改后的临时目录重新打包为 xlsx。
+    // 注意：打包前不能 close pictureReader，否则临时目录会被清理。
     if (!cc::neolux::utils::KFZippa::zip(unpackRoot.string(), m_filePath.toStdString())) {
         qWarning() << "Failed to repack XLSX file";
         m_pictureReader.close();
@@ -612,10 +614,10 @@ bool XLSXEditor::saveRealDelete() {
         return false;
     }
 
-    // Now we can safely close the picture reader (which will delete temp directory)
+    // 打包完成后再清理临时目录。
     m_pictureReader.close();
 
-    // Now reopen both OpenXLSX and XLPictureReader with the modified file
+    // 第 8 阶段：重新打开读取器，保持编辑器处于可继续操作状态。
     m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
     if (!m_wrapper->open(m_filePath.toStdString())) {
         qWarning() << "Failed to reopen OpenXLSX after repacking";
@@ -627,7 +629,6 @@ bool XLSXEditor::saveRealDelete() {
         return false;
     }
 
-    qInfo() << "Real delete completed successfully";
     return true;
 }
 
