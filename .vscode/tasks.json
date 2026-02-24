@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cmake",
+			"label": "build XLSXEditor_test",
+			"command": "build",
+			"targets": [
+				"XLSXEditor_test"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "CMake 模板 生成 任务",
+		}
+	]
+}
