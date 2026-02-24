@@ -106,15 +106,16 @@ void DataItem::applyScale(double scale) {
     const int iconSize = static_cast<int>(std::round(kBaseIconSize * clamped));
     const int innerGap = std::max(1, static_cast<int>(std::round(itemW * gapRatio)));
     const qreal basePointSize = ui->lnData->property("basePointSizeF").toReal();
-    const int baseHeight = ui->lnData->property("baseHeight").toInt();
 
     setFixedSize(itemW, itemH);
     ui->gridLayout->setContentsMargins(innerGap, innerGap, innerGap, innerGap);
     ui->gridLayout->setSpacing(innerGap);
     ui->btnImage->setFixedSize(contentSize, contentSize);
     ui->btnImage->setIconSize(QSize(iconSize, iconSize));
-    ui->lnData->setFixedWidth(contentSize);
-    ui->lnData->setFixedHeight(std::max(16, static_cast<int>(std::round(baseHeight * clamped))));
+    const int textWidth = itemW - 2 * innerGap;
+    const int textHeight = itemH - contentSize - 3 * innerGap;
+    ui->lnData->setFixedWidth(textWidth);
+    ui->lnData->setFixedHeight(std::max(14, textHeight));
 
     QFont textFont = ui->lnData->font();
     textFont.setPointSizeF(std::max<qreal>(6.0, basePointSize * clamped));
