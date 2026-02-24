@@ -39,7 +39,10 @@ public:
 
 private slots:
     void on_btnSave_clicked();
-    void on_btnRestore_clicked();
+    void on_btnPreview_clicked();
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     Ui::XLSXEditor* ui;
@@ -58,15 +61,19 @@ private:
     void parseRange(const QString& range, int& startRow, int& startCol, int& endRow, int& endCol);
     void loadData();
     void loadData(QProgressBar& progressBar);
-    void displayData();
+    void displayData(bool previewOnly = false);
     bool saveData();
-    void restoreData();
     int colToNum(const QString& col);
     QString numToCol(int num);
     QString cellKey(int row, int col) const;
     void showImageDialog(int row, int col);
     void clearDataItems();
     void resetState();
+    void updateScrollWidgetSize();
+    void syncPreviewButtonText();
+    void syncPreviewVisibility();
+    bool m_previewOnly;
+    double m_itemScale;
 };
 
 }  // namespace xlsxeditor

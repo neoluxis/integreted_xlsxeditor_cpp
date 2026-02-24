@@ -9,9 +9,9 @@
         <translation>DataItem</translation>
     </message>
     <message>
-        <location filename="../src/DataItem.ui" line="42"/>
-        <source>Delete</source>
-        <translation>删除</translation>
+        <location filename="../src/DataItem.cpp" line="18"/>
+        <source>Double-click to keep/remove</source>
+        <translation>双击以标记保留/删除</translation>
     </message>
 </context>
 <context>
@@ -23,9 +23,13 @@
     </message>
     <message>
         <location filename="../src/XLSXEditor.ui" line="22"/>
-        <location filename="../src/XLSXEditor.cpp" line="227"/>
-        <source>Restore</source>
-        <translation>恢复</translation>
+        <source>Preview</source>
+        <translation>预览</translation>
+    </message>
+    <message>
+        <location filename="../src/XLSXEditor.cpp" line="402"/>
+        <source>Show All</source>
+        <translation>显示全部</translation>
     </message>
     <message>
         <location filename="../src/XLSXEditor.ui" line="29"/>
@@ -83,11 +87,6 @@
         <location filename="../src/XLSXEditor.cpp" line="220"/>
         <source>Failed to save data to XLSX.</source>
         <translation>保存数据到XLSX失败。</translation>
-    </message>
-    <message>
-        <location filename="../src/XLSXEditor.cpp" line="227"/>
-        <source>Data restored.</source>
-        <translation>数据已恢复。</translation>
     </message>
     <message>
         <location filename="../src/XLSXEditor.cpp" line="258"/>

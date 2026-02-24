@@ -16,13 +16,13 @@
     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,0,1,0">
    <item row="1" column="0">
     <layout class="QHBoxLayout" name="hbButtons">
-     <item>
-      <widget class="QPushButton" name="btnRestore">
-       <property name="text">
-        <string>Restore</string>
-       </property>
-      </widget>
-     </item>
+    <item>
+     <widget class="QPushButton" name="btnPreview">
+      <property name="text">
+       <string>Preview</string>
+      </property>
+     </widget>
+    </item>
      <item>
       <widget class="QPushButton" name="btnSave">
        <property name="text">

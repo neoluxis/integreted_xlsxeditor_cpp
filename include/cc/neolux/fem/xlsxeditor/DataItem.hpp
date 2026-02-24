@@ -29,18 +29,20 @@ public:
     void setRowCol(int row, int col);
     int getRow() const;
     int getCol() const;
+    void applyScale(double scale);
 
 signals:
     void imageClicked(int row, int col);
     void deleteToggled(bool deleted);
 
-private slots:
-    void on_btnMarkDel_clicked();
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     Ui::DataItem* ui;
     bool m_deleted;
     int m_row, m_col;
+    QImage m_image;
 };
 
 }  // namespace xlsxeditor

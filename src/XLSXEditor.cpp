@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDialog>
+#include <QEvent>
 #include <QFile>
 #include <QGridLayout>
 #include <QLabel>
@@ -10,6 +11,9 @@
 #include <QProgressBar>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QWheelEvent>
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <utility>
 
@@ -17,6 +21,10 @@
 #include "ui_XLSXEditor.h"
 
 namespace {
+constexpr int kBaseItemWidth = 70;
+constexpr int kBaseItemHeight = 90;
+constexpr int kGridSpacing = 0;
+
 bool splitCellRef(const QString& ref, QString& colPart, QString& rowPart) {
     colPart.clear();
     rowPart.clear();
@@ -34,9 +42,18 @@ bool splitCellRef(const QString& ref, QString& colPart, QString& rowPart) {
 using namespace cc::neolux::fem::xlsxeditor;
 
 XLSXEditor::XLSXEditor(QWidget* parent)
-    : QWidget(parent), ui(new Ui::XLSXEditor), m_wrapper(nullptr), m_sheetIndex(-1) {
+    : QWidget(parent),
+      ui(new Ui::XLSXEditor),
+      m_wrapper(nullptr),
+      m_sheetIndex(-1),
+      m_previewOnly(false),
+      m_itemScale(1.0) {
     ui->setupUi(this);
     ui->progressBar->setVisible(false);
+    ui->scrollArea->setWidgetResizable(false);
+    ui->scrollArea->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    ui->scrollArea->viewport()->installEventFilter(this);
+    syncPreviewButtonText();
 }
 
 QString XLSXEditor::cellKey(int row, int col) const {
@@ -101,7 +118,7 @@ void XLSXEditor::loadXLSX(const QString& filePath, const QString& sheetName, con
     QCoreApplication::processEvents();
 
     loadData(*ui->progressBar);
-    displayData();
+    displayData(false);
     ui->progressBar->setVisible(false);
 }
 
@@ -232,7 +249,7 @@ void XLSXEditor::loadData(QProgressBar& progressBar) {
         auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex),
                                                descCell.toStdString());
         QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
-        m_data.append({pic.rowNum, pic.colNum, image, desc, false});
+        m_data.append({pic.rowNum, pic.colNum, image, desc, true});
         m_indexByCell.insert(cellKey(pic.rowNum, pic.colNum), m_data.size() - 1);
     }
 }
@@ -254,6 +271,8 @@ void XLSXEditor::resetState() {
     m_data.clear();
     m_indexByCell.clear();
     m_dirtyCells.clear();
+    m_previewOnly = false;
+    m_itemScale = 1.0;
     m_sheetIndex = -1;
     if (m_wrapper) {
         m_wrapper->close();
@@ -267,9 +286,12 @@ void XLSXEditor::resetState() {
         ui->progressBar->setValue(0);
         ui->progressBar->setVisible(false);
     }
+    syncPreviewButtonText();
 }
 
-void XLSXEditor::displayData() {
+void XLSXEditor::displayData(bool previewOnly) {
+    m_previewOnly = previewOnly;
+    syncPreviewButtonText();
     // 清理旧组件
     clearDataItems();
 
@@ -277,29 +299,37 @@ void XLSXEditor::displayData() {
     parseRange(m_range, startRow, startCol, endRow, endCol);
 
     QGridLayout* layout = ui->gridData;
-    layout->setSpacing(0);
+    layout->setSpacing(kGridSpacing);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 
     for (int i = 0; i < m_data.size(); ++i) {
         const auto& entry = m_data[i];
-        if (!entry.image.isNull()) {
-            DataItem* item = new DataItem(this);
-            item->setImage(entry.image);
-            item->setDescription(entry.desc);
-            item->setDeleted(entry.deleted);
-            item->setRowCol(entry.row, entry.col);
-            int gridRow = entry.row - startRow;
-            int gridCol = entry.col - startCol;
-            layout->addWidget(item, gridRow, gridCol);
-            connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {
-                m_data[i].deleted = deleted;
-                m_dirtyCells.insert(cellKey(m_data[i].row, m_data[i].col));
-            });
-            connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
-            m_dataItems.append(item);
-            m_itemByCell.insert(cellKey(entry.row, entry.col), item);
+        if (entry.image.isNull()) {
+            continue;
         }
+
+        DataItem* item = new DataItem(this);
+        item->applyScale(m_itemScale);
+        item->setImage(entry.image);
+        item->setDescription(entry.desc);
+        item->setDeleted(entry.deleted);
+        item->setRowCol(entry.row, entry.col);
+        int gridRow = entry.row - startRow;
+        int gridCol = entry.col - startCol;
+        layout->addWidget(item, gridRow, gridCol);
+        connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {
+            m_data[i].deleted = deleted;
+            m_dirtyCells.insert(cellKey(m_data[i].row, m_data[i].col));
+            syncPreviewVisibility();
+        });
+        connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
+        m_dataItems.append(item);
+        m_itemByCell.insert(cellKey(entry.row, entry.col), item);
     }
+
+    syncPreviewVisibility();
+    updateScrollWidgetSize();
 }
 
 void XLSXEditor::on_btnSave_clicked() {
@@ -310,26 +340,49 @@ void XLSXEditor::on_btnSave_clicked() {
     }
 }
 
-void XLSXEditor::on_btnRestore_clicked() {
-    restoreData();
-    QMessageBox::information(this, tr("Restore"), tr("Data restored."));
+void XLSXEditor::on_btnPreview_clicked() {
+    m_previewOnly = !m_previewOnly;
+    syncPreviewButtonText();
+    syncPreviewVisibility();
+}
+
+bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == ui->scrollArea->viewport() && event->type() == QEvent::Wheel) {
+        auto* wheelEvent = static_cast<QWheelEvent*>(event);
+        if (wheelEvent->modifiers().testFlag(Qt::ControlModifier)) {
+            const int delta = wheelEvent->angleDelta().y();
+            if (delta == 0) {
+                return true;
+            }
+
+            const double steps = static_cast<double>(delta) / 120.0;
+            const double nextScale = std::clamp(m_itemScale + steps * 0.1, 0.5, 2.5);
+            if (std::abs(nextScale - m_itemScale) < 1e-6) {
+                return true;
+            }
+
+            m_itemScale = nextScale;
+            for (auto* item : m_dataItems) {
+                if (item) {
+                    item->applyScale(m_itemScale);
+                }
+            }
+            updateScrollWidgetSize();
+            wheelEvent->accept();
+            return true;
+        }
+    }
+
+    return QWidget::eventFilter(watched, event);
 }
 
 bool XLSXEditor::saveData() {
     // 方案一：全量覆盖保存（当前使用）
     // 保存时覆盖所有数据点的标记状态
     for (const auto& entry : m_data) {
-        QString picCell = numToCol(entry.col) + QString::number(entry.row);
         QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
         cc::neolux::utils::MiniXLSX::CellStyle cs;
         cs.backgroundColor = entry.deleted ? "#FF0000" : "";
-        if (entry.deleted) {
-            m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(),
-                                    "[D]");
-        } else {
-            m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), picCell.toStdString(),
-                                    "");
-        }
         m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
                                 cs);
     }
@@ -379,20 +432,37 @@ void XLSXEditor::showImageDialog(int row, int col) {
     }
 }
 
-void XLSXEditor::restoreData() {
-    // 从内存中恢复dirty的item，不保存到文件
-    for (const QString& key : std::as_const(m_dirtyCells)) {
-        auto indexIt = m_indexByCell.find(key);
-        if (indexIt == m_indexByCell.end()) {
+void XLSXEditor::updateScrollWidgetSize() {
+    int startRow, startCol, endRow, endCol;
+    parseRange(m_range, startRow, startCol, endRow, endCol);
+
+    const int rowCount = std::max(0, endRow - startRow + 1);
+    const int colCount = std::max(0, endCol - startCol + 1);
+    const int itemW = static_cast<int>(std::round(kBaseItemWidth * m_itemScale));
+    const int itemH = static_cast<int>(std::round(kBaseItemHeight * m_itemScale));
+
+    const int contentW = colCount > 0 ? colCount * itemW + (colCount - 1) * kGridSpacing : 0;
+    const int contentH = rowCount > 0 ? rowCount * itemH + (rowCount - 1) * kGridSpacing : 0;
+
+    ui->scrollWidget->resize(contentW, contentH);
+    ui->scrollWidget->setMinimumSize(contentW, contentH);
+}
+
+void XLSXEditor::syncPreviewButtonText() {
+    if (!ui || !ui->btnPreview) {
+        return;
+    }
+    ui->btnPreview->setText(m_previewOnly ? tr("Show All") : tr("Preview"));
+}
+
+void XLSXEditor::syncPreviewVisibility() {
+    for (int i = 0; i < m_data.size(); ++i) {
+        const auto& entry = m_data[i];
+        auto itemIt = m_itemByCell.find(cellKey(entry.row, entry.col));
+        if (itemIt == m_itemByCell.end() || itemIt.value() == nullptr) {
             continue;
         }
-        int index = indexIt.value();
-        m_data[index].deleted = false;
-
-        auto itemIt = m_itemByCell.find(key);
-        if (itemIt != m_itemByCell.end() && itemIt.value()) {
-            itemIt.value()->setDeleted(false);
-        }
+        const bool visible = !m_previewOnly || !entry.deleted;
+        itemIt.value()->setVisible(visible);
     }
-    m_dirtyCells.clear();
 }
