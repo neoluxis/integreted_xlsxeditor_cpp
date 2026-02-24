@@ -32,10 +32,12 @@ class XLSXEditor : public QWidget {
     Q_OBJECT
 
 public:
-    explicit XLSXEditor(QWidget* parent = nullptr);
+    explicit XLSXEditor(QWidget* parent = nullptr, bool dry_run = true);
     ~XLSXEditor();
 
     void loadXLSX(const QString& filePath, const QString& sheetName, const QString& range);
+    void setDryRun(bool dry_run);
+    bool isDryRun() const;
 
 private slots:
     void on_btnSave_clicked();
@@ -74,6 +76,7 @@ private:
     void syncPreviewButtonText();
     void syncPreviewVisibility();
     void syncSelectAllState();
+    bool m_dryRun;
     bool m_previewOnly;
     double m_itemScale;
     bool m_syncingSelectAll;

@@ -42,11 +42,12 @@ bool splitCellRef(const QString& ref, QString& colPart, QString& rowPart) {
 
 using namespace cc::neolux::fem::xlsxeditor;
 
-XLSXEditor::XLSXEditor(QWidget* parent)
+XLSXEditor::XLSXEditor(QWidget* parent, bool dry_run)
     : QWidget(parent),
       ui(new Ui::XLSXEditor),
       m_wrapper(nullptr),
       m_sheetIndex(-1),
+      m_dryRun(dry_run),
       m_previewOnly(false),
       m_itemScale(1.0),
       m_syncingSelectAll(false) {
@@ -122,6 +123,14 @@ void XLSXEditor::loadXLSX(const QString& filePath, const QString& sheetName, con
     loadData(*ui->progressBar);
     displayData(false);
     ui->progressBar->setVisible(false);
+}
+
+void XLSXEditor::setDryRun(bool dry_run) {
+    m_dryRun = dry_run;
+}
+
+bool XLSXEditor::isDryRun() const {
+    return m_dryRun;
 }
 
 void XLSXEditor::parseRange(const QString& range, int& startRow, int& startCol, int& endRow,
@@ -406,14 +415,25 @@ bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
 }
 
 bool XLSXEditor::saveData() {
-    // 方案一：全量覆盖保存（当前使用）
-    // 保存时覆盖所有数据点的标记状态
-    for (const auto& entry : m_data) {
-        QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
-        cc::neolux::utils::MiniXLSX::CellStyle cs;
-        cs.backgroundColor = entry.deleted ? "#FF0000" : "";
-        m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
-                                cs);
+    if (m_dryRun) {
+        // Dry-run: 仅写入标记状态，不做真实删除。
+        for (const auto& entry : m_data) {
+            QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
+            cc::neolux::utils::MiniXLSX::CellStyle cs;
+            cs.backgroundColor = entry.deleted ? "#FF0000" : "";
+            m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+                                    cs);
+        }
+    } else {
+        // Real-delete 模式预留：下一步在此分支实现真实删除逻辑。
+        // 目前先保持与 dry-run 一致，避免行为突变。
+        for (const auto& entry : m_data) {
+            QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
+            cc::neolux::utils::MiniXLSX::CellStyle cs;
+            cs.backgroundColor = entry.deleted ? "#FF0000" : "";
+            m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+                                    cs);
+        }
     }
 
     // 方案二：仅保存有变更的单元格（备用）
