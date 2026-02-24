@@ -30,6 +30,7 @@ namespace {
 constexpr int kBaseItemWidth = 70;
 constexpr int kBaseItemHeight = 90;
 constexpr int kGridSpacing = 0;
+constexpr bool kEnableSaveProgress = true;
 
 bool splitCellRef(const QString& ref, QString& colPart, QString& rowPart) {
     colPart.clear();
@@ -52,6 +53,7 @@ XLSXEditor::XLSXEditor(QWidget* parent, bool dry_run)
       ui(new Ui::XLSXEditor),
       m_wrapper(nullptr),
       m_sheetIndex(-1),
+      m_enableSaveProgress(kEnableSaveProgress),
       m_dryRun(dry_run),
       m_previewOnly(false),
       m_itemScale(1.0),
@@ -425,19 +427,60 @@ bool XLSXEditor::saveData() {
     return saved;
 }
 
+void XLSXEditor::beginSaveProgress(int maximum) {
+    if (!m_enableSaveProgress || !ui || !ui->progressBar) {
+        return;
+    }
+    ui->progressBar->setMinimum(0);
+    ui->progressBar->setMaximum(std::max(1, maximum));
+    ui->progressBar->setValue(0);
+    ui->progressBar->setFormat(tr("Saving... %p%"));
+    ui->progressBar->setVisible(true);
+    QCoreApplication::processEvents();
+}
+
+void XLSXEditor::updateSaveProgress(int value) {
+    if (!m_enableSaveProgress || !ui || !ui->progressBar || !ui->progressBar->isVisible()) {
+        return;
+    }
+    ui->progressBar->setValue(value);
+    QCoreApplication::processEvents();
+}
+
+void XLSXEditor::endSaveProgress() {
+    if (!m_enableSaveProgress || !ui || !ui->progressBar) {
+        return;
+    }
+    ui->progressBar->setFormat(QStringLiteral("%p%"));
+    ui->progressBar->setVisible(false);
+    QCoreApplication::processEvents();
+}
+
 bool XLSXEditor::saveFakeDelete() {
+    const int total = std::max(1, static_cast<int>(m_data.size()) + 1);
+    beginSaveProgress(total);
+
+    int progress = 0;
     for (const auto& entry : m_data) {
         QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
         cc::neolux::utils::MiniXLSX::CellStyle cs;
         cs.backgroundColor = entry.deleted ? "#FF0000" : "";
         m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
                                 cs);
+        updateSaveProgress(++progress);
     }
 
-    return m_wrapper->save();
+    const bool ok = m_wrapper->save();
+    updateSaveProgress(total);
+    endSaveProgress();
+    return ok;
 }
 
 bool XLSXEditor::saveRealDelete() {
+    const int total = std::max(1, static_cast<int>(m_data.size()) + 8);
+    beginSaveProgress(total);
+    int progress = 0;
+
     // 第 1 阶段：先通过 OpenXLSX 写回描述单元格（清空标记删除项）
     // 这样可以确保文本与样式修改由上层接口稳定落盘。
     for (const auto& entry : m_data) {
@@ -450,12 +493,15 @@ bool XLSXEditor::saveRealDelete() {
             m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
                                     "");
         }
+        updateSaveProgress(++progress);
     }
 
     if (!m_wrapper->save()) {
         qWarning() << "fail to save cell modifications";
+        endSaveProgress();
         return false;
     }
+    updateSaveProgress(++progress);
 
     // 第 2 阶段：关闭 OpenXLSX 句柄，避免后续 XML 文件改写时的占用冲突。
     m_wrapper->close();
@@ -466,11 +512,14 @@ bool XLSXEditor::saveRealDelete() {
 
     // 第 3 阶段：重新解压文件，准备直接修改 drawing 与关系 XML。
     if (!m_pictureReader.open(m_filePath.toStdString())) {
+        endSaveProgress();
         return false;
     }
+    updateSaveProgress(++progress);
 
     const std::string tempDir = m_pictureReader.getTempDir();
     if (tempDir.empty()) {
+        endSaveProgress();
         return false;
     }
 
@@ -485,8 +534,11 @@ bool XLSXEditor::saveRealDelete() {
     if (!fs::exists(drawingPath) || !fs::exists(drawingRelsPath)) {
         m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
         if (!m_wrapper->open(m_filePath.toStdString())) {
+            endSaveProgress();
             return false;
         }
+        updateSaveProgress(total);
+        endSaveProgress();
         return true;
     }
 
@@ -500,19 +552,23 @@ bool XLSXEditor::saveRealDelete() {
 
     pugi::xml_document drawingDoc;
     if (!drawingDoc.load_file(drawingPath.c_str())) {
+        endSaveProgress();
         return false;
     }
 
     pugi::xml_document relsDoc;
     if (!relsDoc.load_file(drawingRelsPath.c_str())) {
+        endSaveProgress();
         return false;
     }
+    updateSaveProgress(++progress);
 
     pugi::xml_node wsDr = drawingDoc.child("xdr:wsDr");
     if (!wsDr) {
         wsDr = drawingDoc.first_child();
     }
     if (!wsDr) {
+        endSaveProgress();
         return false;
     }
 
@@ -546,14 +602,17 @@ bool XLSXEditor::saveRealDelete() {
     }
 
     if (!drawingDoc.save_file(drawingPath.c_str(), PUGIXML_TEXT("  "))) {
+        endSaveProgress();
         return false;
     }
+    updateSaveProgress(++progress);
 
     pugi::xml_node relRoot = relsDoc.child("Relationships");
     if (!relRoot) {
         relRoot = relsDoc.first_child();
     }
     if (!relRoot) {
+        endSaveProgress();
         return false;
     }
 
@@ -573,8 +632,10 @@ bool XLSXEditor::saveRealDelete() {
     }
 
     if (!relsDoc.save_file(drawingRelsPath.c_str(), PUGIXML_TEXT("  "))) {
+        endSaveProgress();
         return false;
     }
+    updateSaveProgress(++progress);
 
     // 第 6 阶段：删除已不再被任何关系引用的 media 图片文件。
     std::unordered_set<std::string> activeImageTargets;
@@ -606,13 +667,17 @@ bool XLSXEditor::saveRealDelete() {
         // Try to reopen anyway
         m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
         if (!m_wrapper->open(m_filePath.toStdString())) {
+            endSaveProgress();
             return false;
         }
         if (!m_pictureReader.open(m_filePath.toStdString())) {
+            endSaveProgress();
             return false;
         }
+        endSaveProgress();
         return false;
     }
+    updateSaveProgress(++progress);
 
     // 打包完成后再清理临时目录。
     m_pictureReader.close();
@@ -621,13 +686,18 @@ bool XLSXEditor::saveRealDelete() {
     m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
     if (!m_wrapper->open(m_filePath.toStdString())) {
         qWarning() << "Failed to reopen OpenXLSX after repacking";
+        endSaveProgress();
         return false;
     }
 
     if (!m_pictureReader.open(m_filePath.toStdString())) {
         qWarning() << "Failed to reopen XLPictureReader after repacking";
+        endSaveProgress();
         return false;
     }
+
+    updateSaveProgress(total);
+    endSaveProgress();
 
     return true;
 }

@@ -202,6 +202,29 @@ private:
 
     /** @brief 根据数据删除状态同步“全选”复选框状态。 */
     void syncSelectAllState();
+
+    /**
+     * @brief 开始保存进度显示。
+     * @param maximum 进度最大值。
+     */
+    void beginSaveProgress(int maximum);
+
+    /**
+     * @brief 更新保存进度值。
+     * @param value 当前进度值。
+     */
+    void updateSaveProgress(int value);
+
+    /** @brief 结束保存进度显示。 */
+    void endSaveProgress();
+
+    /**
+     * @brief 是否启用保存进度条。
+     *
+     * 直接在代码中改此变量即可全局开关保存进度显示。
+     */
+    bool m_enableSaveProgress;
+
     bool m_dryRun;
     bool m_previewOnly;
     double m_itemScale;
