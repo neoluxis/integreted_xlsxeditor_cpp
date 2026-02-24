@@ -1,0 +1,3 @@
+[submodule "3rdparty/MiniXLSX"]
+	path = 3rdparty/MiniXLSX
+	url = https://github.com/neoluxis/MiniXLSX-cpp.git
