@@ -66,6 +66,8 @@ private:
     void loadData(QProgressBar& progressBar);
     void displayData(bool previewOnly = false);
     bool saveData();
+    bool saveFakeDelete();
+    bool saveRealDelete();
     int colToNum(const QString& col);
     QString numToCol(int num);
     QString cellKey(int row, int col) const;

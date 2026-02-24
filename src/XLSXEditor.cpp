@@ -15,10 +15,15 @@
 #include <QWheelEvent>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
+#include <pugixml.hpp>
+#include <set>
+#include <unordered_set>
 #include <utility>
 
 #include "cc/neolux/fem/xlsxeditor/DataItem.hpp"
+#include "cc/neolux/utils/KFZippa/kfzippa.hpp"
 #include "ui_XLSXEditor.h"
 
 namespace {
@@ -415,54 +420,215 @@ bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
 }
 
 bool XLSXEditor::saveData() {
-    if (m_dryRun) {
-        // Dry-run: 仅写入标记状态，不做真实删除。
-        for (const auto& entry : m_data) {
-            QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
-            cc::neolux::utils::MiniXLSX::CellStyle cs;
-            cs.backgroundColor = entry.deleted ? "#FF0000" : "";
-            m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
-                                    cs);
-        }
-    } else {
-        // Real-delete 模式预留：下一步在此分支实现真实删除逻辑。
-        // 目前先保持与 dry-run 一致，避免行为突变。
-        for (const auto& entry : m_data) {
-            QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
-            cc::neolux::utils::MiniXLSX::CellStyle cs;
-            cs.backgroundColor = entry.deleted ? "#FF0000" : "";
-            m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
-                                    cs);
-        }
-    }
-
-    // 方案二：仅保存有变更的单元格（备用）
-    // for (const QString &key : std::as_const(m_dirtyCells)) {
-    //     auto it = m_indexByCell.find(key);
-    //     if (it == m_indexByCell.end()) {
-    //         continue;
-    //     }
-    //     const auto &entry = m_data[it.value()];
-    //     QString picCell = numToCol(entry.col) + QString::number(entry.row);
-    //     QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
-    //     cc::neolux::utils::MiniXLSX::CellStyle cs;
-    //     cs.backgroundColor = entry.deleted ? "#FF0000" : "";
-    //     if (entry.deleted) {
-    //         m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex),
-    //         picCell.toStdString(), "[D]");
-    //     } else {
-    //         m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex),
-    //         picCell.toStdString(), "");
-    //     }
-    //     m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
-    //     cs);
-    // }
-
-    bool saved = m_wrapper->save();
+    const bool saved = m_dryRun ? saveFakeDelete() : saveRealDelete();
     if (saved) {
         m_dirtyCells.clear();
     }
     return saved;
+}
+
+bool XLSXEditor::saveFakeDelete() {
+    for (const auto& entry : m_data) {
+        QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
+        cc::neolux::utils::MiniXLSX::CellStyle cs;
+        cs.backgroundColor = entry.deleted ? "#FF0000" : "";
+        m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+                                cs);
+    }
+
+    return m_wrapper->save();
+}
+
+bool XLSXEditor::saveRealDelete() {
+    // First, save cell modifications through OpenXLSX API
+    for (const auto& entry : m_data) {
+        QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
+        cc::neolux::utils::MiniXLSX::CellStyle cs;
+        cs.backgroundColor = "";
+        m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+                                cs);
+        if (entry.deleted) {
+            m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+                                    "");
+        }
+    }
+
+    if (!m_wrapper->save()) {
+        qWarning() << "fail to save cell modifications";
+        return false;
+    }
+
+    // Close OpenXLSX to release the file
+    m_wrapper->close();
+    delete m_wrapper;
+    m_wrapper = nullptr;
+
+    m_pictureReader.close();
+
+    // Now reopen for XML modifications
+    if (!m_pictureReader.open(m_filePath.toStdString())) {
+        return false;
+    }
+
+    const std::string tempDir = m_pictureReader.getTempDir();
+    if (tempDir.empty()) {
+        return false;
+    }
+
+    namespace fs = std::filesystem;
+    const fs::path unpackRoot(tempDir);
+    const fs::path drawingPath =
+        unpackRoot / "xl" / "drawings" / ("drawing" + std::to_string(m_sheetIndex + 1) + ".xml");
+    const fs::path drawingRelsPath =
+        drawingPath.parent_path() / "_rels" / (drawingPath.filename().string() + ".rels");
+
+    // If no drawing files exist, just reopen and return
+    if (!fs::exists(drawingPath) || !fs::exists(drawingRelsPath)) {
+        m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
+        if (!m_wrapper->open(m_filePath.toStdString())) {
+            return false;
+        }
+        return true;
+    }
+
+    std::set<std::pair<int, int>> deletedCoords;
+    for (const auto& entry : m_data) {
+        if (entry.deleted) {
+            deletedCoords.insert({entry.row, entry.col});
+        }
+    }
+
+    pugi::xml_document drawingDoc;
+    if (!drawingDoc.load_file(drawingPath.c_str())) {
+        return false;
+    }
+
+    pugi::xml_document relsDoc;
+    if (!relsDoc.load_file(drawingRelsPath.c_str())) {
+        return false;
+    }
+
+    pugi::xml_node wsDr = drawingDoc.child("xdr:wsDr");
+    if (!wsDr) {
+        wsDr = drawingDoc.first_child();
+    }
+    if (!wsDr) {
+        return false;
+    }
+
+    std::unordered_set<std::string> removedEmbedIds;
+    for (pugi::xml_node anchor = wsDr.first_child(); anchor;) {
+        pugi::xml_node nextAnchor = anchor.next_sibling();
+        if (std::string(anchor.name()) != "xdr:twoCellAnchor") {
+            anchor = nextAnchor;
+            continue;
+        }
+
+        pugi::xml_node from = anchor.child("xdr:from");
+        const int colNum = from.child("xdr:col").text().as_int(-1) + 1;
+        const int rowNum = from.child("xdr:row").text().as_int(-1) + 1;
+        if (deletedCoords.find({rowNum, colNum}) == deletedCoords.end()) {
+            anchor = nextAnchor;
+            continue;
+        }
+
+        const std::string embedId = anchor.child("xdr:pic")
+                                        .child("xdr:blipFill")
+                                        .child("a:blip")
+                                        .attribute("r:embed")
+                                        .as_string();
+        qInfo() << "  -> embedId:" << QString::fromStdString(embedId);
+        if (!embedId.empty()) {
+            removedEmbedIds.insert(embedId);
+        }
+        wsDr.remove_child(anchor);
+        anchor = nextAnchor;
+    }
+
+    if (!drawingDoc.save_file(drawingPath.c_str(), PUGIXML_TEXT("  "))) {
+        return false;
+    }
+
+    pugi::xml_node relRoot = relsDoc.child("Relationships");
+    if (!relRoot) {
+        relRoot = relsDoc.first_child();
+    }
+    if (!relRoot) {
+        return false;
+    }
+
+    std::unordered_set<std::string> removedTargets;
+    for (pugi::xml_node rel = relRoot.child("Relationship"); rel;) {
+        pugi::xml_node nextRel = rel.next_sibling("Relationship");
+        const std::string id = rel.attribute("Id").as_string();
+        if (removedEmbedIds.find(id) != removedEmbedIds.end()) {
+            const std::string target = rel.attribute("Target").as_string();
+            if (!target.empty()) {
+                removedTargets.insert(target);
+            }
+            relRoot.remove_child(rel);
+        }
+        rel = nextRel;
+    }
+
+    if (!relsDoc.save_file(drawingRelsPath.c_str(), PUGIXML_TEXT("  "))) {
+        return false;
+    }
+
+    std::unordered_set<std::string> activeImageTargets;
+    for (pugi::xml_node rel = relRoot.child("Relationship"); rel;
+         rel = rel.next_sibling("Relationship")) {
+        const std::string type = rel.attribute("Type").as_string();
+        if (type.find("/image") != std::string::npos) {
+            activeImageTargets.insert(rel.attribute("Target").as_string());
+        }
+    }
+
+    for (const auto& target : removedTargets) {
+        if (activeImageTargets.find(target) != activeImageTargets.end()) {
+            continue;
+        }
+        const fs::path imagePath =
+            (drawingPath.parent_path() / fs::path(target)).lexically_normal();
+        if (fs::exists(imagePath)) {
+            std::error_code ec;
+            fs::remove(imagePath, ec);
+        }
+    }
+
+    // Use KFZippa to repack the modified temp directory directly to the original file
+    // IMPORTANT: Don't close m_pictureReader yet! We still need the temp directory
+    if (!cc::neolux::utils::KFZippa::zip(unpackRoot.string(), m_filePath.toStdString())) {
+        qWarning() << "Failed to repack XLSX file";
+        m_pictureReader.close();
+        // Try to reopen anyway
+        m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
+        if (!m_wrapper->open(m_filePath.toStdString())) {
+            return false;
+        }
+        if (!m_pictureReader.open(m_filePath.toStdString())) {
+            return false;
+        }
+        return false;
+    }
+
+    // Now we can safely close the picture reader (which will delete temp directory)
+    m_pictureReader.close();
+
+    // Now reopen both OpenXLSX and XLPictureReader with the modified file
+    m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
+    if (!m_wrapper->open(m_filePath.toStdString())) {
+        qWarning() << "Failed to reopen OpenXLSX after repacking";
+        return false;
+    }
+
+    if (!m_pictureReader.open(m_filePath.toStdString())) {
+        qWarning() << "Failed to reopen XLPictureReader after repacking";
+        return false;
+    }
+
+    qInfo() << "Real delete completed successfully";
+    return true;
 }
 
 void XLSXEditor::showImageDialog(int row, int col) {
