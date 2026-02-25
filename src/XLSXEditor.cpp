@@ -4,8 +4,10 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDialog>
+#include <QDir>
 #include <QEvent>
 #include <QFile>
+#include <QFileInfo>
 #include <QGridLayout>
 #include <QLabel>
 #include <QMessageBox>
@@ -357,7 +359,8 @@ void XLSXEditor::displayData(bool previewOnly) {
 
 void XLSXEditor::on_btnSave_clicked() {
     if (saveData()) {
-        QMessageBox::information(this, tx("Save"), tx("Data saved to XLSX."));
+        QMessageBox::information(this, tx("Save"),
+                                 tx("Data saved to XLSX: %1").arg(m_saveFilePath));
     } else {
         QMessageBox::critical(this, tx("Save Error"), tx("Failed to save data to XLSX."));
     }
@@ -424,11 +427,66 @@ bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
 }
 
 bool XLSXEditor::saveData() {
+    if (!prepareSaveTargetFile()) {
+        return false;
+    }
+
     const bool saved = m_dryRun ? saveFakeDelete() : saveRealDelete();
     if (saved) {
         m_dirtyCells.clear();
     }
     return saved;
+}
+
+bool XLSXEditor::prepareSaveTargetFile() {
+    if (m_filePath.isEmpty()) {
+        return false;
+    }
+
+    QFileInfo sourceInfo(m_filePath);
+    const QDir sourceDir = sourceInfo.absoluteDir();
+    const QString filteredDirPath = sourceDir.filePath("filtered");
+
+    QDir dir;
+    if (!dir.mkpath(filteredDirPath)) {
+        qWarning() << "Failed to create filtered folder:" << filteredDirPath;
+        return false;
+    }
+
+    const QString targetPath = QDir(filteredDirPath).filePath(sourceInfo.fileName());
+    QFile::remove(targetPath);
+    if (!QFile::copy(sourceInfo.absoluteFilePath(), targetPath)) {
+        qWarning() << "Failed to copy source xlsx to filtered target:" << targetPath;
+        return false;
+    }
+
+    if (m_wrapper) {
+        m_wrapper->close();
+        delete m_wrapper;
+        m_wrapper = nullptr;
+    }
+    if (m_pictureReader.isOpen()) {
+        m_pictureReader.close();
+    }
+
+    m_saveFilePath = targetPath;
+    m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
+    if (!m_wrapper->open(m_saveFilePath.toStdString())) {
+        delete m_wrapper;
+        m_wrapper = nullptr;
+        qWarning() << "Failed to open filtered xlsx target:" << m_saveFilePath;
+        return false;
+    }
+
+    if (!m_pictureReader.open(m_saveFilePath.toStdString())) {
+        m_wrapper->close();
+        delete m_wrapper;
+        m_wrapper = nullptr;
+        qWarning() << "Failed to open picture reader on filtered xlsx target:" << m_saveFilePath;
+        return false;
+    }
+
+    return true;
 }
 
 void XLSXEditor::beginSaveProgress(int maximum) {
@@ -515,7 +573,7 @@ bool XLSXEditor::saveRealDelete() {
     m_pictureReader.close();
 
     // 第 3 阶段：重新解压文件，准备直接修改 drawing 与关系 XML。
-    if (!m_pictureReader.open(m_filePath.toStdString())) {
+    if (!m_pictureReader.open(m_saveFilePath.toStdString())) {
         endSaveProgress();
         return false;
     }
@@ -537,7 +595,7 @@ bool XLSXEditor::saveRealDelete() {
     // 没有 drawing 文件说明当前表没有图片对象，直接恢复打开状态即可。
     if (!fs::exists(drawingPath) || !fs::exists(drawingRelsPath)) {
         m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
-        if (!m_wrapper->open(m_filePath.toStdString())) {
+        if (!m_wrapper->open(m_saveFilePath.toStdString())) {
             endSaveProgress();
             return false;
         }
@@ -665,16 +723,16 @@ bool XLSXEditor::saveRealDelete() {
 
     // 第 7 阶段：将修改后的临时目录重新打包为 xlsx。
     // 注意：打包前不能 close pictureReader，否则临时目录会被清理。
-    if (!cc::neolux::utils::KFZippa::zip(unpackRoot.string(), m_filePath.toStdString())) {
+    if (!cc::neolux::utils::KFZippa::zip(unpackRoot.string(), m_saveFilePath.toStdString())) {
         qWarning() << "Failed to repack XLSX file";
         m_pictureReader.close();
         // Try to reopen anyway
         m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
-        if (!m_wrapper->open(m_filePath.toStdString())) {
+        if (!m_wrapper->open(m_saveFilePath.toStdString())) {
             endSaveProgress();
             return false;
         }
-        if (!m_pictureReader.open(m_filePath.toStdString())) {
+        if (!m_pictureReader.open(m_saveFilePath.toStdString())) {
             endSaveProgress();
             return false;
         }
@@ -688,13 +746,13 @@ bool XLSXEditor::saveRealDelete() {
 
     // 第 8 阶段：重新打开读取器，保持编辑器处于可继续操作状态。
     m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
-    if (!m_wrapper->open(m_filePath.toStdString())) {
+    if (!m_wrapper->open(m_saveFilePath.toStdString())) {
         qWarning() << "Failed to reopen OpenXLSX after repacking";
         endSaveProgress();
         return false;
     }
 
-    if (!m_pictureReader.open(m_filePath.toStdString())) {
+    if (!m_pictureReader.open(m_saveFilePath.toStdString())) {
         qWarning() << "Failed to reopen XLPictureReader after repacking";
         endSaveProgress();
         return false;

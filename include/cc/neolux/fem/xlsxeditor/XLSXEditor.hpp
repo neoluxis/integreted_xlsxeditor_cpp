@@ -102,6 +102,7 @@ protected:
 private:
     Ui::XLSXEditor* ui;
     QString m_filePath;
+    QString m_saveFilePath;
     QString m_sheetName;
     QString m_range;
     QVector<DataEntry> m_data;  // 图片与描述及其位置
@@ -143,6 +144,7 @@ private:
      * @return 保存成功返回 true，否则返回 false。
      */
     bool saveData();
+    bool prepareSaveTargetFile();
 
     /**
      * @brief 假删除保存：仅写回描述背景色标记。
