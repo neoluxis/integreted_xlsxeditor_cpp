@@ -26,13 +26,15 @@
 #include "cc/neolux/utils/KFZippa/kfzippa.hpp"
 #include "ui_XLSXEditor.h"
 
-#define tr(sourceText) QCoreApplication::translate("XLSXEditor", sourceText)
-
 namespace {
 constexpr int kBaseItemWidth = 70;
 constexpr int kBaseItemHeight = 90;
 constexpr int kGridSpacing = 0;
 constexpr bool kEnableSaveProgress = true;
+
+QString tx(const char* sourceText) {
+    return QCoreApplication::translate("XLSXEditor", sourceText);
+}
 
 bool splitCellRef(const QString& ref, QString& colPart, QString& rowPart) {
     colPart.clear();
@@ -92,13 +94,13 @@ void XLSXEditor::loadXLSX(const QString& filePath, const QString& sheetName, con
 
     m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
     if (!m_wrapper->open(filePath.toStdString())) {
-        QMessageBox::critical(this, tr("Error"), tr("Failed to open XLSX file."));
+        QMessageBox::critical(this, tx("Error"), tx("Failed to open XLSX file."));
         ui->progressBar->setVisible(false);
         return;
     }
 
     if (!m_pictureReader.open(filePath.toStdString())) {
-        QMessageBox::critical(this, tr("Error"), tr("Failed to prepare picture reader."));
+        QMessageBox::critical(this, tx("Error"), tx("Failed to prepare picture reader."));
         m_wrapper->close();
         ui->progressBar->setVisible(false);
         return;
@@ -113,7 +115,7 @@ void XLSXEditor::loadXLSX(const QString& filePath, const QString& sheetName, con
         }
     }
     if (m_sheetIndex < 0) {
-        QMessageBox::critical(this, tr("Error"), tr("Sheet not found: %1").arg(sheetName));
+        QMessageBox::critical(this, tx("Error"), tx("Sheet not found: %1").arg(sheetName));
         ui->progressBar->setVisible(false);
         return;
     }
@@ -355,9 +357,9 @@ void XLSXEditor::displayData(bool previewOnly) {
 
 void XLSXEditor::on_btnSave_clicked() {
     if (saveData()) {
-        QMessageBox::information(this, tr("Save"), tr("Data saved to XLSX."));
+        QMessageBox::information(this, tx("Save"), tx("Data saved to XLSX."));
     } else {
-        QMessageBox::critical(this, tr("Save Error"), tr("Failed to save data to XLSX."));
+        QMessageBox::critical(this, tx("Save Error"), tx("Failed to save data to XLSX."));
     }
 }
 
@@ -436,7 +438,7 @@ void XLSXEditor::beginSaveProgress(int maximum) {
     ui->progressBar->setMinimum(0);
     ui->progressBar->setMaximum(std::max(1, maximum));
     ui->progressBar->setValue(0);
-    ui->progressBar->setFormat(tr("Saving... %p%"));
+    ui->progressBar->setFormat(tx("Saving... %p%"));
     ui->progressBar->setVisible(true);
     QCoreApplication::processEvents();
 }
@@ -708,7 +710,7 @@ void XLSXEditor::showImageDialog(int row, int col) {
     for (const auto& entry : m_data) {
         if (entry.row == row && entry.col == col && !entry.image.isNull()) {
             QDialog dialog(this);
-            dialog.setWindowTitle(tr("Image Preview"));
+            dialog.setWindowTitle(tx("Image Preview"));
             QLabel* label = new QLabel(&dialog);
             label->setPixmap(QPixmap::fromImage(entry.image));
             QVBoxLayout* layout = new QVBoxLayout(&dialog);
@@ -740,7 +742,7 @@ void XLSXEditor::syncPreviewButtonText() {
     if (!ui || !ui->btnPreview) {
         return;
     }
-    ui->btnPreview->setText(m_previewOnly ? tr("Show All") : tr("Preview"));
+    ui->btnPreview->setText(m_previewOnly ? tx("Show All") : tx("Preview"));
 }
 
 void XLSXEditor::syncPreviewVisibility() {

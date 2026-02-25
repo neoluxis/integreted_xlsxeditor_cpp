@@ -1,7 +1,6 @@
 #include "cc/neolux/fem/xlsxeditor/DataItem.hpp"
 
 #include <QCoreApplication>
-#include <QDebug>
 #include <QEvent>
 #include <QLabel>
 #include <QPixmap>
@@ -11,17 +10,19 @@
 
 #include "ui_DataItem.h"
 
-#define tr(sourceText) QCoreApplication::translate("DataItem", sourceText)
-
-using namespace cc::neolux::fem::xlsxeditor;
-
 namespace {
 constexpr int kBaseItemWidth = 70;
 constexpr int kBaseItemHeight = 90;
 constexpr int kBaseContentSize = 68;
 constexpr int kBaseIconSize = 66;
 constexpr double kInnerGapPercent = 0.3;
+
+QString tx(const char* sourceText) {
+    return QCoreApplication::translate("DataItem", sourceText);
+}
 }  // namespace
+
+namespace cc::neolux::fem::xlsxeditor {
 
 DataItem::DataItem(QWidget* parent)
     : QWidget(parent), ui(new Ui::DataItem), m_deleted(true), m_row(-1), m_col(-1) {
@@ -38,7 +39,7 @@ DataItem::DataItem(QWidget* parent)
     connect(ui->btnImage, &QPushButton::pressed, this,
             [this]() { emit imageClicked(m_row, m_col); });
     ui->lnData->setReadOnly(true);  // 数据只读，防止误修改
-    ui->lnData->setToolTip(tr("Double-click to keep/remove"));
+    ui->lnData->setToolTip(tx("Double-click to keep/remove"));
     ui->lnData->installEventFilter(this);
     const qreal basePointSize =
         ui->lnData->font().pointSizeF() > 0 ? ui->lnData->font().pointSizeF() : 9.0;
@@ -140,3 +141,5 @@ bool DataItem::eventFilter(QObject* watched, QEvent* event) {
 
     return QWidget::eventFilter(watched, event);
 }
+
+}  // namespace cc::neolux::fem::xlsxeditor
