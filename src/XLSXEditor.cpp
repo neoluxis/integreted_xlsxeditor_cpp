@@ -287,20 +287,23 @@ void XLSXEditor::loadData(QProgressBar& progressBar) {
         progressBar.setValue(++current);
         QCoreApplication::processEvents();
 
-        std::string imagePath = tempDir + "/xl/" + pic.relativePath;
-        std::ifstream file(imagePath, std::ios::binary);
         QImage image;
-        if (file) {
-            std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),
-                                       std::istreambuf_iterator<char>());
-            image = QImage::fromData(bytes.data(), bytes.size());
+        const QString tempDirQ = QString::fromStdString(tempDir);
+        QDir rootDir(tempDirQ);
+        const QString imagePath =
+            rootDir.filePath(QStringLiteral("xl/") + QString::fromStdString(pic.relativePath));
+        // qInfo() << "Loading image from" << imagePath;
+
+        QFile qfile(imagePath);
+        if (qfile.open(QIODevice::ReadOnly)) {
+            const QByteArray bytes = qfile.readAll();
+            image = QImage::fromData(bytes);
             if (image.isNull()) {
-                // QMessageBox::warning(this, tr("Warning"), tr("Failed to load image from
-                // %1").arg(QString::fromStdString(imagePath)));
-                qWarning() << "Failed to load image from" << QString::fromStdString(imagePath);
+                qWarning() << "Failed to load image from" << imagePath;
             }
+            qfile.close();
         } else {
-            qWarning() << "Image file not found:" << QString::fromStdString(imagePath);
+            qWarning() << "Image file not found:" << imagePath;
         }
 
         const QString value = readCellText(pic.rowNum + 1, pic.colNum);
