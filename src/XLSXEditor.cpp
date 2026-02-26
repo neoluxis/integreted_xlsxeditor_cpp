@@ -1045,21 +1045,25 @@ void XLSXEditor::showHoverPreview(int row, int col) {
     }
 
     const int maxSide = 1000;
-    QPixmap pm = QPixmap::fromImage(img).scaled(maxSide, maxSide, Qt::KeepAspectRatio,
-                                                Qt::SmoothTransformation);
-    // 保存原始用于缩放
-    m_hoverOrigPixmap = pm;
+    // 保留原始像素图用于质量缩放
+    QPixmap orig = QPixmap::fromImage(img);
+    m_hoverOrigPixmap = orig;
 
-    QSize finalSize = pm.size();
+    // 默认尺寸为原始尺寸的 2 倍（受上限限制），如果存在持久化尺寸则使用持久化尺寸
+    QSize defaultSize = orig.size() * 2;
+    defaultSize.setWidth(std::min(defaultSize.width(), maxSide));
+    defaultSize.setHeight(std::min(defaultSize.height(), maxSide));
+
+    QSize targetSize = defaultSize;
     if (m_savedHoverPreviewSize.isValid() && m_savedHoverPreviewSize.width() > 0 &&
         m_savedHoverPreviewSize.height() > 0) {
-        QPixmap scaled = m_hoverOrigPixmap.scaled(m_savedHoverPreviewSize, Qt::KeepAspectRatio,
-                                                  Qt::SmoothTransformation);
-        m_hoverPreview->setPixmap(scaled);
-        finalSize = scaled.size();
-    } else {
-        m_hoverPreview->setPixmap(pm);
+        targetSize = m_savedHoverPreviewSize;
     }
+
+    QPixmap scaled =
+        m_hoverOrigPixmap.scaled(targetSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    m_hoverPreview->setPixmap(scaled);
+    QSize finalSize = scaled.size();
     m_hoverPreview->setFixedSize(finalSize);
 
     const QPoint globalPos = item->imageWidgetGlobalPos();
