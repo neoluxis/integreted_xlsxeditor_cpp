@@ -97,12 +97,7 @@ public:
     void applyScale(double scale);
 
 signals:
-    /**
-     * @brief 图片点击信号。
-     * @param row 当前项行号。
-     * @param col 当前项列号。
-     */
-    void imageClicked(int row, int col);
+    // 已移除：点击预览逻辑改为悬停预览，点击信号不再使用。
 
     /**
      * @brief 当鼠标进入图片区域时发射（用于悬停预览）。

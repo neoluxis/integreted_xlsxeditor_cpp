@@ -938,21 +938,7 @@ bool XLSXEditor::saveRealDelete() {
     return true;
 }
 
-void XLSXEditor::showImageDialog(int row, int col) {
-    for (const auto& entry : m_data) {
-        if (entry.row == row && entry.col == col && !entry.image.isNull()) {
-            QDialog dialog(this);
-            dialog.setWindowTitle(tx("Image Preview"));
-            QLabel* label = new QLabel(&dialog);
-            label->setPixmap(QPixmap::fromImage(entry.image));
-            QVBoxLayout* layout = new QVBoxLayout(&dialog);
-            layout->addWidget(label);
-            dialog.setLayout(layout);
-            dialog.exec();
-            break;
-        }
-    }
-}
+// 已移除：旧的点击弹窗预览函数，改为悬停预览实现。
 
 void XLSXEditor::showHoverPreview(int row, int col) {
     const QString key = cellKey(row, col);

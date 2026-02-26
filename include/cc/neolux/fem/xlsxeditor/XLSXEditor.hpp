@@ -185,12 +185,7 @@ private:
      */
     QString cellKey(int row, int col) const;
 
-    /**
-     * @brief 弹出图片预览对话框。
-     * @param row 图片所在行。
-     * @param col 图片所在列。
-     */
-    void showImageDialog(int row, int col);
+    // 已移除：旧的点击弹窗预览接口，改为悬停预览。
 
     /** @brief 清理并销毁当前界面中的 DataItem 组件。 */
     void clearDataItems();
