@@ -281,7 +281,7 @@ void XLSXEditor::loadData(QProgressBar& progressBar) {
         }
 
         const QString value = readCellText(pic.rowNum + 1, pic.colNum);
-        m_data.append({pic.rowNum, pic.colNum, image, value, true});
+        m_data.append({pic.rowNum, pic.colNum, image, value, false});
         m_indexByCell.insert(cellKey(pic.rowNum, pic.colNum), m_data.size() - 1);
     }
 }
