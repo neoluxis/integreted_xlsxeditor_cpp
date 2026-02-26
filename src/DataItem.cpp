@@ -36,8 +36,8 @@ DataItem::DataItem(QWidget* parent)
     ui->gridLayout->setSpacing(0);
     ui->btnImage->setFlat(true);
     ui->btnImage->setStyleSheet("QPushButton { border: 0; padding: 0; margin: 0; }");
-    connect(ui->btnImage, &QPushButton::pressed, this,
-            [this]() { emit imageClicked(m_row, m_col); });
+    // 改为通过悬停预览：安装事件过滤器以捕获 Enter/Leave
+    ui->btnImage->installEventFilter(this);
     ui->lnData->setReadOnly(true);  // 数据只读，防止误修改
     ui->lnData->setToolTip(tx("Double-click to keep/remove"));
     ui->lnData->installEventFilter(this);
@@ -139,7 +139,27 @@ bool DataItem::eventFilter(QObject* watched, QEvent* event) {
         return true;
     }
 
+    if (watched == ui->btnImage) {
+        if (event->type() == QEvent::Enter) {
+            emit imageEntered(m_row, m_col);
+            return true;
+        } else if (event->type() == QEvent::Leave) {
+            emit imageLeft(m_row, m_col);
+            return true;
+        }
+    }
     return QWidget::eventFilter(watched, event);
+}
+
+QImage DataItem::getImage() const {
+    return m_image;
+}
+
+QPoint DataItem::imageWidgetGlobalPos() const {
+    if (!ui || !ui->btnImage) {
+        return QPoint();
+    }
+    return ui->btnImage->mapToGlobal(QPoint(0, 0));
 }
 
 }  // namespace cc::neolux::fem::xlsxeditor

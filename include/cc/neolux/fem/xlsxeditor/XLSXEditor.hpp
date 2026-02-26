@@ -2,6 +2,7 @@
 
 #include <QHash>
 #include <QImage>
+#include <QLabel>
 #include <QProgressBar>
 #include <QSet>
 #include <QString>
@@ -234,6 +235,14 @@ private:
     bool m_previewOnly;
     double m_itemScale;
     bool m_syncingSelectAll;
+
+    // 悬停预览相关
+    QLabel* m_hoverPreview;
+    int m_hoverRow;
+    int m_hoverCol;
+
+    void showHoverPreview(int row, int col);
+    void hideHoverPreview(int row, int col);
 };
 
 }  // namespace xlsxeditor

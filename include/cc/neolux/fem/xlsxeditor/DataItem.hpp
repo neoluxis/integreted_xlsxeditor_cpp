@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QImage>
+#include <QPoint>
 #include <QString>
 #include <QWidget>
 
@@ -104,6 +105,16 @@ signals:
     void imageClicked(int row, int col);
 
     /**
+     * @brief 当鼠标进入图片区域时发射（用于悬停预览）。
+     */
+    void imageEntered(int row, int col);
+
+    /**
+     * @brief 当鼠标离开图片区域时发射（用于关闭悬停预览）。
+     */
+    void imageLeft(int row, int col);
+
+    /**
      * @brief 删除状态切换信号。
      * @param deleted 新的删除状态。
      */
@@ -117,6 +128,13 @@ protected:
      * @return true 表示事件已处理，false 表示继续默认分发。
      */
     bool eventFilter(QObject* watched, QEvent* event) override;
+
+public:
+    /** @brief 获取当前项持有的原始图片。 */
+    QImage getImage() const;
+
+    /** @brief 返回图片按钮在全局坐标系中的左上角位置。 */
+    QPoint imageWidgetGlobalPos() const;
 
 private:
     Ui::DataItem* ui;

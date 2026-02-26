@@ -65,7 +65,10 @@ XLSXEditor::XLSXEditor(QWidget* parent, bool dry_run)
       m_dryRun(dry_run),
       m_previewOnly(false),
       m_itemScale(1.0),
-      m_syncingSelectAll(false) {
+      m_syncingSelectAll(false),
+      m_hoverPreview(nullptr),
+      m_hoverRow(-1),
+      m_hoverCol(-1) {
     ui->setupUi(this);
     ui->progressBar->setVisible(false);
     ui->scrollArea->setWidgetResizable(false);
@@ -439,7 +442,8 @@ void XLSXEditor::displayData(bool previewOnly) {
             syncPreviewVisibility();
             syncSelectAllState();
         });
-        connect(item, &DataItem::imageClicked, this, &XLSXEditor::showImageDialog);
+        connect(item, &DataItem::imageEntered, this, &XLSXEditor::showHoverPreview);
+        connect(item, &DataItem::imageLeft, this, &XLSXEditor::hideHoverPreview);
         m_dataItems.append(item);
         m_itemByCell.insert(cellKey(entry.row, entry.col), item);
     }
@@ -926,6 +930,58 @@ void XLSXEditor::showImageDialog(int row, int col) {
             dialog.exec();
             break;
         }
+    }
+}
+
+void XLSXEditor::showHoverPreview(int row, int col) {
+    const QString key = cellKey(row, col);
+    auto it = m_itemByCell.find(key);
+    if (it == m_itemByCell.end() || it.value() == nullptr) {
+        return;
+    }
+    DataItem* item = it.value();
+    QImage img = item->getImage();
+    if (img.isNull()) {
+        return;
+    }
+
+    if (!m_hoverPreview) {
+        m_hoverPreview = new QLabel(this);
+        m_hoverPreview->setWindowFlags(Qt::ToolTip);
+        m_hoverPreview->setAttribute(Qt::WA_ShowWithoutActivating);
+        m_hoverPreview->setStyleSheet("border:1px solid #888; background:#ffffff;");
+    }
+
+    const int maxSide = 300;
+    QPixmap pm = QPixmap::fromImage(img).scaled(maxSide, maxSide, Qt::KeepAspectRatio,
+                                                Qt::SmoothTransformation);
+    m_hoverPreview->setPixmap(pm);
+    m_hoverPreview->setFixedSize(pm.size());
+
+    const QPoint globalPos = item->imageWidgetGlobalPos();
+    const QPoint localPos = this->mapFromGlobal(globalPos);
+    int x = localPos.x() + 20;
+    int y = localPos.y() - pm.height() - 10;
+    if (y < 0) {
+        y = localPos.y() + 20;
+    }
+    if (x + pm.width() > this->width()) {
+        x = this->width() - pm.width() - 10;
+        if (x < 0) x = 0;
+    }
+
+    m_hoverPreview->move(x, y);
+    m_hoverPreview->show();
+    m_hoverRow = row;
+    m_hoverCol = col;
+}
+
+void XLSXEditor::hideHoverPreview(int row, int col) {
+    if (!m_hoverPreview) return;
+    if (m_hoverRow == row && m_hoverCol == col) {
+        m_hoverPreview->hide();
+        m_hoverRow = -1;
+        m_hoverCol = -1;
     }
 }
 
