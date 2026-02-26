@@ -6,6 +6,7 @@
 #include <QProgressBar>
 #include <QSet>
 #include <QString>
+#include <QTimer>
 #include <QVector>
 #include <QWidget>
 #include <cc/neolux/utils/MiniXLSX/OpenXLSXWrapper.hpp>
@@ -240,6 +241,7 @@ private:
     QLabel* m_hoverPreview;
     int m_hoverRow;
     int m_hoverCol;
+    QTimer* m_hoverHideTimer;
 
     void showHoverPreview(int row, int col);
     void hideHoverPreview(int row, int col);

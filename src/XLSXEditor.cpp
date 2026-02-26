@@ -74,6 +74,16 @@ XLSXEditor::XLSXEditor(QWidget* parent, bool dry_run)
     ui->scrollArea->setWidgetResizable(false);
     ui->scrollArea->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     ui->scrollArea->viewport()->installEventFilter(this);
+    // 悬停隐藏计时器，避免在 image <-> preview 之间闪烁
+    m_hoverHideTimer = new QTimer(this);
+    m_hoverHideTimer->setSingleShot(true);
+    connect(m_hoverHideTimer, &QTimer::timeout, this, [this]() {
+        if (m_hoverPreview) {
+            m_hoverPreview->hide();
+        }
+        m_hoverRow = -1;
+        m_hoverCol = -1;
+    });
     syncPreviewButtonText();
 }
 
@@ -493,6 +503,17 @@ void XLSXEditor::on_chkSelectAll_stateChanged(int state) {
 }
 
 bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == m_hoverPreview) {
+        if (event->type() == QEvent::Enter) {
+            if (m_hoverHideTimer) m_hoverHideTimer->stop();
+            return true;
+        } else if (event->type() == QEvent::Leave) {
+            if (m_hoverRow >= 0 && m_hoverCol >= 0) {
+                if (m_hoverHideTimer) m_hoverHideTimer->start(150);
+            }
+            return true;
+        }
+    }
     if (event->type() == QEvent::MouseButtonDblClick) {
         auto* header = qobject_cast<QLabel*>(watched);
         if (header != nullptr && header->property("batchAxis").isValid() &&
@@ -950,6 +971,7 @@ void XLSXEditor::showHoverPreview(int row, int col) {
         m_hoverPreview->setWindowFlags(Qt::ToolTip);
         m_hoverPreview->setAttribute(Qt::WA_ShowWithoutActivating);
         m_hoverPreview->setStyleSheet("border:1px solid #888; background:#ffffff;");
+        m_hoverPreview->installEventFilter(this);
     }
 
     const int maxSide = 300;
@@ -971,6 +993,7 @@ void XLSXEditor::showHoverPreview(int row, int col) {
     }
 
     m_hoverPreview->move(x, y);
+    m_hoverHideTimer->stop();
     m_hoverPreview->show();
     m_hoverRow = row;
     m_hoverCol = col;
@@ -979,9 +1002,13 @@ void XLSXEditor::showHoverPreview(int row, int col) {
 void XLSXEditor::hideHoverPreview(int row, int col) {
     if (!m_hoverPreview) return;
     if (m_hoverRow == row && m_hoverCol == col) {
-        m_hoverPreview->hide();
-        m_hoverRow = -1;
-        m_hoverCol = -1;
+        if (m_hoverHideTimer) {
+            m_hoverHideTimer->start(150);
+        } else {
+            m_hoverPreview->hide();
+            m_hoverRow = -1;
+            m_hoverCol = -1;
+        }
     }
 }
 
