@@ -31,6 +31,8 @@
 namespace {
 constexpr int kBaseItemWidth = 70;
 constexpr int kBaseItemHeight = 90;
+constexpr int kBaseHeaderColWidth = 90;
+constexpr int kBaseHeaderRowHeight = 24;
 constexpr int kGridSpacing = 0;
 constexpr bool kEnableSaveProgress = true;
 
@@ -215,6 +217,17 @@ QString XLSXEditor::numToCol(int num) {
     return col;
 }
 
+QString XLSXEditor::readCellText(int row, int col) {
+    if (row <= 0 || col <= 0 || m_wrapper == nullptr || m_sheetIndex < 0) {
+        return "";
+    }
+
+    const QString cell = numToCol(col) + QString::number(row);
+    auto cellOpt =
+        m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex), cell.toStdString());
+    return cellOpt.has_value() ? QString::fromStdString(cellOpt.value()).trimmed() : "";
+}
+
 void XLSXEditor::loadData(QProgressBar& progressBar) {
     m_data.clear();
     m_indexByCell.clear();
@@ -267,11 +280,8 @@ void XLSXEditor::loadData(QProgressBar& progressBar) {
             qWarning() << "Image file not found:" << QString::fromStdString(imagePath);
         }
 
-        QString descCell = numToCol(pic.colNum) + QString::number(pic.rowNum + 1);
-        auto descOpt = m_wrapper->getCellValue(static_cast<unsigned int>(m_sheetIndex),
-                                               descCell.toStdString());
-        QString desc = descOpt.has_value() ? QString::fromStdString(descOpt.value()) : "";
-        m_data.append({pic.rowNum, pic.colNum, image, desc, true});
+        const QString value = readCellText(pic.rowNum + 1, pic.colNum);
+        m_data.append({pic.rowNum, pic.colNum, image, value, true});
         m_indexByCell.insert(cellKey(pic.rowNum, pic.colNum), m_data.size() - 1);
     }
 }
@@ -284,7 +294,12 @@ void XLSXEditor::clearDataItems() {
         ui->gridData->removeWidget(item);
         delete item;
     }
+    for (auto widget : m_headerWidgets) {
+        ui->gridData->removeWidget(widget);
+        delete widget;
+    }
     m_dataItems.clear();
+    m_headerWidgets.clear();
     m_itemByCell.clear();
 }
 
@@ -326,6 +341,69 @@ void XLSXEditor::displayData(bool previewOnly) {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 
+    QSet<int> rowSet;
+    QSet<int> colSet;
+    for (const auto& entry : std::as_const(m_data)) {
+        if (!entry.image.isNull()) {
+            rowSet.insert(entry.row);
+            colSet.insert(entry.col);
+        }
+    }
+    QVector<int> displayRows = rowSet.values();
+    QVector<int> displayCols = colSet.values();
+    std::sort(displayRows.begin(), displayRows.end());
+    std::sort(displayCols.begin(), displayCols.end());
+
+    QHash<int, int> rowToGridRow;
+    QHash<int, int> colToGridCol;
+    for (int i = 0; i < displayRows.size(); ++i) {
+        rowToGridRow.insert(displayRows[i], i + 1);
+    }
+    for (int i = 0; i < displayCols.size(); ++i) {
+        colToGridCol.insert(displayCols[i], i + 1);
+    }
+
+    const int headerWidth = static_cast<int>(std::round(kBaseHeaderColWidth * m_itemScale));
+    const int headerHeight = static_cast<int>(std::round(kBaseHeaderRowHeight * m_itemScale));
+
+    QLabel* corner = new QLabel(this);
+    corner->setText(" ");
+    corner->setAlignment(Qt::AlignCenter);
+    corner->setFixedSize(headerWidth, headerHeight);
+    layout->addWidget(corner, 0, 0);
+    m_headerWidgets.append(corner);
+
+    for (int i = 0; i < displayCols.size(); ++i) {
+        const int col = displayCols[i];
+        QString header = readCellText(2, col);
+        if (header.isEmpty()) {
+            header = numToCol(col);
+        }
+
+        QLabel* colHeader = new QLabel(this);
+        colHeader->setText(header);
+        colHeader->setAlignment(Qt::AlignCenter);
+        colHeader->setWordWrap(true);
+        colHeader->setFixedSize(static_cast<int>(std::round(kBaseItemWidth * m_itemScale)),
+                                headerHeight);
+        layout->addWidget(colHeader, 0, i + 1);
+        m_headerWidgets.append(colHeader);
+    }
+
+    for (int i = 0; i < displayRows.size(); ++i) {
+        const int row = displayRows[i];
+        QString header = readCellText(row, 1);
+
+        QLabel* rowHeader = new QLabel(this);
+        rowHeader->setText(header);
+        rowHeader->setAlignment(Qt::AlignCenter);
+        rowHeader->setWordWrap(true);
+        rowHeader->setFixedSize(headerWidth,
+                                static_cast<int>(std::round(kBaseItemHeight * m_itemScale)));
+        layout->addWidget(rowHeader, i + 1, 0);
+        m_headerWidgets.append(rowHeader);
+    }
+
     for (int i = 0; i < m_data.size(); ++i) {
         const auto& entry = m_data[i];
         if (entry.image.isNull()) {
@@ -338,8 +416,14 @@ void XLSXEditor::displayData(bool previewOnly) {
         item->setDescription(entry.desc);
         item->setDeleted(entry.deleted);
         item->setRowCol(entry.row, entry.col);
-        int gridRow = entry.row - startRow;
-        int gridCol = entry.col - startCol;
+        if (!rowToGridRow.contains(entry.row)) {
+            continue;
+        }
+        if (!colToGridCol.contains(entry.col)) {
+            continue;
+        }
+        int gridRow = rowToGridRow.value(entry.row);
+        int gridCol = colToGridCol.value(entry.col);
         layout->addWidget(item, gridRow, gridCol);
         connect(item, &DataItem::deleteToggled, [this, i](bool deleted) {
             m_data[i].deleted = deleted;
@@ -784,13 +868,25 @@ void XLSXEditor::updateScrollWidgetSize() {
     int startRow, startCol, endRow, endCol;
     parseRange(m_range, startRow, startCol, endRow, endCol);
 
-    const int rowCount = std::max(0, endRow - startRow + 1);
-    const int colCount = std::max(0, endCol - startCol + 1);
+    QSet<int> rowSet;
+    QSet<int> colSet;
+    for (const auto& entry : std::as_const(m_data)) {
+        if (!entry.image.isNull()) {
+            rowSet.insert(entry.row);
+            colSet.insert(entry.col);
+        }
+    }
+    const int rowCount = rowSet.size();
+    const int colCount = colSet.size();
     const int itemW = static_cast<int>(std::round(kBaseItemWidth * m_itemScale));
     const int itemH = static_cast<int>(std::round(kBaseItemHeight * m_itemScale));
+    const int headerW = static_cast<int>(std::round(kBaseHeaderColWidth * m_itemScale));
+    const int headerH = static_cast<int>(std::round(kBaseHeaderRowHeight * m_itemScale));
 
-    const int contentW = colCount > 0 ? colCount * itemW + (colCount - 1) * kGridSpacing : 0;
-    const int contentH = rowCount > 0 ? rowCount * itemH + (rowCount - 1) * kGridSpacing : 0;
+    const int contentW =
+        colCount > 0 ? headerW + colCount * itemW + colCount * kGridSpacing : headerW;
+    const int contentH =
+        rowCount > 0 ? headerH + rowCount * itemH + rowCount * kGridSpacing : headerH;
 
     ui->scrollWidget->resize(contentW, contentH);
     ui->scrollWidget->setMinimumSize(contentW, contentH);

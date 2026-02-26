@@ -107,6 +107,7 @@ private:
     QString m_range;
     QVector<DataEntry> m_data;  // 图片与描述及其位置
     QVector<DataItem*> m_dataItems;
+    QVector<QWidget*> m_headerWidgets;
     QHash<QString, int> m_indexByCell;
     QHash<QString, DataItem*> m_itemByCell;
     QSet<QString> m_dirtyCells;
@@ -171,6 +172,8 @@ private:
      * @return 列字母（如 A、AB）。
      */
     QString numToCol(int num);
+
+    QString readCellText(int row, int col);
 
     /**
      * @brief 生成单元格键值（row:col）。
