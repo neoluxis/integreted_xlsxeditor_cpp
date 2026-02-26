@@ -384,6 +384,10 @@ void XLSXEditor::displayData(bool previewOnly) {
         colHeader->setText(header);
         colHeader->setAlignment(Qt::AlignCenter);
         colHeader->setWordWrap(true);
+        colHeader->setToolTip(tx("Double-click to toggle this column"));
+        colHeader->setProperty("batchAxis", "col");
+        colHeader->setProperty("batchIndex", col);
+        colHeader->installEventFilter(this);
         colHeader->setFixedSize(static_cast<int>(std::round(kBaseItemWidth * m_itemScale)),
                                 headerHeight);
         layout->addWidget(colHeader, 0, i + 1);
@@ -398,6 +402,10 @@ void XLSXEditor::displayData(bool previewOnly) {
         rowHeader->setText(header);
         rowHeader->setAlignment(Qt::AlignCenter);
         rowHeader->setWordWrap(true);
+        rowHeader->setToolTip(tx("Double-click to toggle this row"));
+        rowHeader->setProperty("batchAxis", "row");
+        rowHeader->setProperty("batchIndex", row);
+        rowHeader->installEventFilter(this);
         rowHeader->setFixedSize(headerWidth,
                                 static_cast<int>(std::round(kBaseItemHeight * m_itemScale)));
         layout->addWidget(rowHeader, i + 1, 0);
@@ -481,6 +489,63 @@ void XLSXEditor::on_chkSelectAll_stateChanged(int state) {
 }
 
 bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::MouseButtonDblClick) {
+        auto* header = qobject_cast<QLabel*>(watched);
+        if (header != nullptr && header->property("batchAxis").isValid() &&
+            header->property("batchIndex").isValid()) {
+            const QString axis = header->property("batchAxis").toString();
+            const int index = header->property("batchIndex").toInt();
+
+            bool hasTarget = false;
+            bool allKept = true;
+            for (const auto& entry : std::as_const(m_data)) {
+                if (entry.image.isNull()) {
+                    continue;
+                }
+                if ((axis == "row" && entry.row != index) ||
+                    (axis == "col" && entry.col != index)) {
+                    continue;
+                }
+                hasTarget = true;
+                if (entry.deleted) {
+                    allKept = false;
+                    break;
+                }
+            }
+
+            if (!hasTarget) {
+                return true;
+            }
+
+            const bool nextDeleted = allKept;
+            for (int i = 0; i < m_data.size(); ++i) {
+                const auto& entry = m_data[i];
+                if (entry.image.isNull()) {
+                    continue;
+                }
+                if ((axis == "row" && entry.row != index) ||
+                    (axis == "col" && entry.col != index)) {
+                    continue;
+                }
+                if (m_data[i].deleted == nextDeleted) {
+                    continue;
+                }
+
+                m_data[i].deleted = nextDeleted;
+                m_dirtyCells.insert(cellKey(m_data[i].row, m_data[i].col));
+
+                auto itemIt = m_itemByCell.find(cellKey(m_data[i].row, m_data[i].col));
+                if (itemIt != m_itemByCell.end() && itemIt.value() != nullptr) {
+                    itemIt.value()->setDeleted(nextDeleted);
+                }
+            }
+
+            syncPreviewVisibility();
+            syncSelectAllState();
+            return true;
+        }
+    }
+
     if (watched == ui->scrollArea->viewport() && event->type() == QEvent::Wheel) {
         auto* wheelEvent = static_cast<QWheelEvent*>(event);
         if (wheelEvent->modifiers().testFlag(Qt::ControlModifier)) {
