@@ -11,7 +11,10 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QMouseEvent>
+#include <QPixmap>
 #include <QProgressBar>
+#include <QSettings>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWheelEvent>
@@ -68,7 +71,8 @@ XLSXEditor::XLSXEditor(QWidget* parent, bool dry_run)
       m_syncingSelectAll(false),
       m_hoverPreview(nullptr),
       m_hoverRow(-1),
-      m_hoverCol(-1) {
+      m_hoverCol(-1),
+      m_hoverResizing(false) {
     ui->setupUi(this);
     ui->progressBar->setVisible(false);
     ui->scrollArea->setWidgetResizable(false);
@@ -84,6 +88,12 @@ XLSXEditor::XLSXEditor(QWidget* parent, bool dry_run)
         m_hoverRow = -1;
         m_hoverCol = -1;
     });
+    // 读取持久化的预览尺寸（如果有）
+    QSettings settings;
+    const QVariant v = settings.value("XLSXEditor/hoverPreviewSize");
+    if (v.isValid() && v.canConvert<QSize>()) {
+        m_savedHoverPreviewSize = v.toSize();
+    }
     syncPreviewButtonText();
 }
 
@@ -512,6 +522,79 @@ bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
                 if (m_hoverHideTimer) m_hoverHideTimer->start(150);
             }
             return true;
+        } else if (event->type() == QEvent::MouseButtonPress) {
+            auto* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton && me->modifiers().testFlag(Qt::ControlModifier)) {
+                m_hoverResizing = true;
+                m_hoverResizeStartPos = me->globalPosition().toPoint();
+                if (m_hoverPreview) m_hoverPreviewStartSize = m_hoverPreview->size();
+                if (m_hoverHideTimer) m_hoverHideTimer->stop();
+                return true;
+            }
+        } else if (event->type() == QEvent::MouseMove) {
+            if (m_hoverResizing) {
+                auto* me = static_cast<QMouseEvent*>(event);
+                const QPoint cur = me->globalPosition().toPoint();
+                const QPoint delta = cur - m_hoverResizeStartPos;
+                QSize newSize = m_hoverPreviewStartSize + QSize(delta.x(), delta.y());
+                const int minSide = 50;
+                newSize.setWidth(std::max(minSide, newSize.width()));
+                newSize.setHeight(std::max(minSide, newSize.height()));
+                if (!m_hoverOrigPixmap.isNull()) {
+                    QPixmap scaled = m_hoverOrigPixmap.scaled(newSize, Qt::KeepAspectRatio,
+                                                              Qt::SmoothTransformation);
+                    m_hoverPreview->setPixmap(scaled);
+                    m_hoverPreview->setFixedSize(scaled.size());
+                    // 重新定位预览，使其仍然贴近触发图片位置
+                    if (m_hoverRow >= 0 && m_hoverCol >= 0) {
+                        auto it = m_itemByCell.find(cellKey(m_hoverRow, m_hoverCol));
+                        if (it != m_itemByCell.end() && it.value() != nullptr) {
+                            DataItem* anchor = it.value();
+                            const QPoint g = anchor->imageWidgetGlobalPos();
+                            const QPoint lp = this->mapFromGlobal(g);
+                            const QSize s = scaled.size();
+                            int nx = lp.x() + 20;
+                            int ny = lp.y() - s.height() - 10;
+                            if (ny < 0) ny = lp.y() + 20;
+                            if (nx + s.width() > this->width()) {
+                                nx = this->width() - s.width() - 10;
+                                if (nx < 0) nx = 0;
+                            }
+                            m_hoverPreview->move(nx, ny);
+                        }
+                    }
+                } else {
+                    m_hoverPreview->setFixedSize(newSize);
+                    if (m_hoverRow >= 0 && m_hoverCol >= 0) {
+                        auto it = m_itemByCell.find(cellKey(m_hoverRow, m_hoverCol));
+                        if (it != m_itemByCell.end() && it.value() != nullptr) {
+                            DataItem* anchor = it.value();
+                            const QPoint g = anchor->imageWidgetGlobalPos();
+                            const QPoint lp = this->mapFromGlobal(g);
+                            int nx = lp.x() + 20;
+                            int ny = lp.y() - newSize.height() - 10;
+                            if (ny < 0) ny = lp.y() + 20;
+                            if (nx + newSize.width() > this->width()) {
+                                nx = this->width() - newSize.width() - 10;
+                                if (nx < 0) nx = 0;
+                            }
+                            m_hoverPreview->move(nx, ny);
+                        }
+                    }
+                }
+                return true;
+            }
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            if (m_hoverResizing) {
+                m_hoverResizing = false;
+                // 拖动结束后将最终尺寸持久化到 QSettings，以便重启后恢复
+                if (m_hoverPreview) {
+                    QSettings settings;
+                    settings.setValue("XLSXEditor/hoverPreviewSize", m_hoverPreview->size());
+                    m_savedHoverPreviewSize = m_hoverPreview->size();
+                }
+                return true;
+            }
         }
     }
     if (event->type() == QEvent::MouseButtonDblClick) {
@@ -953,6 +1036,7 @@ void XLSXEditor::showHoverPreview(int row, int col) {
     }
 
     if (!m_hoverPreview) {
+        // 创建 tooltip 风格的 QLabel 作为预览窗格，并对其安装事件过滤器以支持交互
         m_hoverPreview = new QLabel(this);
         m_hoverPreview->setWindowFlags(Qt::ToolTip);
         m_hoverPreview->setAttribute(Qt::WA_ShowWithoutActivating);
@@ -960,24 +1044,39 @@ void XLSXEditor::showHoverPreview(int row, int col) {
         m_hoverPreview->installEventFilter(this);
     }
 
-    const int maxSide = 300;
+    const int maxSide = 1000;
     QPixmap pm = QPixmap::fromImage(img).scaled(maxSide, maxSide, Qt::KeepAspectRatio,
                                                 Qt::SmoothTransformation);
-    m_hoverPreview->setPixmap(pm);
-    m_hoverPreview->setFixedSize(pm.size());
+    // 保存原始用于缩放
+    m_hoverOrigPixmap = pm;
+
+    QSize finalSize = pm.size();
+    if (m_savedHoverPreviewSize.isValid() && m_savedHoverPreviewSize.width() > 0 &&
+        m_savedHoverPreviewSize.height() > 0) {
+        QPixmap scaled = m_hoverOrigPixmap.scaled(m_savedHoverPreviewSize, Qt::KeepAspectRatio,
+                                                  Qt::SmoothTransformation);
+        m_hoverPreview->setPixmap(scaled);
+        finalSize = scaled.size();
+    } else {
+        m_hoverPreview->setPixmap(pm);
+    }
+    m_hoverPreview->setFixedSize(finalSize);
 
     const QPoint globalPos = item->imageWidgetGlobalPos();
     const QPoint localPos = this->mapFromGlobal(globalPos);
+    int previewW = finalSize.width();
+    int previewH = finalSize.height();
     int x = localPos.x() + 20;
-    int y = localPos.y() - pm.height() - 10;
+    int y = localPos.y() - previewH - 10;
     if (y < 0) {
         y = localPos.y() + 20;
     }
-    if (x + pm.width() > this->width()) {
-        x = this->width() - pm.width() - 10;
+    if (x + previewW > this->width()) {
+        x = this->width() - previewW - 10;
         if (x < 0) x = 0;
     }
 
+    // 将预览移动到合适位置，停止隐藏计时器并显示
     m_hoverPreview->move(x, y);
     m_hoverHideTimer->stop();
     m_hoverPreview->show();
@@ -989,6 +1088,7 @@ void XLSXEditor::hideHoverPreview(int row, int col) {
     if (!m_hoverPreview) return;
     if (m_hoverRow == row && m_hoverCol == col) {
         if (m_hoverHideTimer) {
+            // 启动延迟隐藏，给可能从图片移动到预览窗格的鼠标留出缓冲时间
             m_hoverHideTimer->start(150);
         } else {
             m_hoverPreview->hide();

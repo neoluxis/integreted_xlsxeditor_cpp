@@ -140,10 +140,13 @@ bool DataItem::eventFilter(QObject* watched, QEvent* event) {
     }
 
     if (watched == ui->btnImage) {
+        // 鼠标进入图片按钮：通知父组件显示悬停预览
         if (event->type() == QEvent::Enter) {
             emit imageEntered(m_row, m_col);
             return true;
-        } else if (event->type() == QEvent::Leave) {
+        }
+        // 鼠标离开图片按钮：通知父组件隐藏（或延迟隐藏）悬停预览
+        else if (event->type() == QEvent::Leave) {
             emit imageLeft(m_row, m_col);
             return true;
         }
@@ -151,10 +154,18 @@ bool DataItem::eventFilter(QObject* watched, QEvent* event) {
     return QWidget::eventFilter(watched, event);
 }
 
+/**
+ * @brief 返回当前项持有的图片（原始 QImage）。
+ */
 QImage DataItem::getImage() const {
     return m_image;
 }
 
+/**
+ * @brief 返回图片按钮在屏幕全局坐标系中的左上角位置。
+ *
+ * 该接口用于在主界面中定位悬停预览窗格时将 item 的本地位置转换为全局坐标。
+ */
 QPoint DataItem::imageWidgetGlobalPos() const {
     if (!ui || !ui->btnImage) {
         return QPoint();

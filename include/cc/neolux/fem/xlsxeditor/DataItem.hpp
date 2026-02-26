@@ -18,7 +18,7 @@ namespace xlsxeditor {
  * @brief 单个图片-描述数据展示组件。
  *
  * 该组件用于在网格中展示一组数据：
- * - 图片按钮（点击可预览）
+ * - 图片按钮（悬停可预览）
  * - 描述输入框（双击切换删除状态）
  */
 class DataItem : public QWidget {
@@ -97,15 +97,17 @@ public:
     void applyScale(double scale);
 
 signals:
-    // 已移除：点击预览逻辑改为悬停预览，点击信号不再使用。
-
     /**
      * @brief 当鼠标进入图片区域时发射（用于悬停预览）。
+     * @param row 图片所在的工作表行（1-based）。
+     * @param col 图片所在的工作表列（1-based）。
      */
     void imageEntered(int row, int col);
 
     /**
      * @brief 当鼠标离开图片区域时发射（用于关闭悬停预览）。
+     * @param row 图片所在的工作表行（1-based）。
+     * @param col 图片所在的工作表列（1-based）。
      */
     void imageLeft(int row, int col);
 
@@ -117,7 +119,7 @@ signals:
 
 protected:
     /**
-     * @brief 事件过滤器，用于处理描述框双击切换删除状态。
+     * @brief 事件过滤器，用于处理描述框双击切换删除状态与图片悬停事件。
      * @param watched 事件源对象。
      * @param event 事件对象。
      * @return true 表示事件已处理，false 表示继续默认分发。
@@ -125,10 +127,16 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 public:
-    /** @brief 获取当前项持有的原始图片。 */
+    /**
+     * @brief 获取当前项持有的原始图片。
+     * @return QImage 原始图片对象（可能为空）。
+     */
     QImage getImage() const;
 
-    /** @brief 返回图片按钮在全局坐标系中的左上角位置。 */
+    /**
+     * @brief 返回内部图片按钮在屏幕全局坐标系中的左上角位置。
+     * @return QPoint 局部左上角的全局坐标，用于在主界面中定位预览窗格。
+     */
     QPoint imageWidgetGlobalPos() const;
 
 private:

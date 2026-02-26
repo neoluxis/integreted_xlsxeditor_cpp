@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QImage>
 #include <QLabel>
+#include <QPixmap>
 #include <QProgressBar>
 #include <QSet>
 #include <QString>
@@ -233,10 +234,25 @@ private:
     bool m_syncingSelectAll;
 
     // 悬停预览相关
+    /** @brief 悬停预览窗格的指针（在主窗口内作为 tooltip 风格的 QLabel）。 */
     QLabel* m_hoverPreview;
+    /** @brief 当前正在预览的单元格行号（1-based），-1 表示无）。 */
     int m_hoverRow;
+    /** @brief 当前正在预览的单元格列号（1-based），-1 表示无）。 */
     int m_hoverCol;
+    /** @brief 延迟隐藏计时器，用于避免 image <-> preview 切换时闪烁。 */
     QTimer* m_hoverHideTimer;
+    // 悬停预览大小调整相关状态
+    /** @brief 是否处于通过 Ctrl+左键拖动的调整大小交互中。 */
+    bool m_hoverResizing;
+    /** @brief 调整开始时鼠标的全局坐标（用于计算增量）。 */
+    QPoint m_hoverResizeStartPos;
+    /** @brief 调整开始时预览窗格的尺寸。 */
+    QSize m_hoverPreviewStartSize;
+    /** @brief 持久化保存的预览尺寸，重启后恢复该尺寸。 */
+    QSize m_savedHoverPreviewSize; /**< persisted across restarts */
+    /** @brief 当前用于显示的原始 pixmap（用于缩放以保持质量）。 */
+    QPixmap m_hoverOrigPixmap;
 
     void showHoverPreview(int row, int col);
     void hideHoverPreview(int row, int col);
