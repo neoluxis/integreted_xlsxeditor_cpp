@@ -80,6 +80,15 @@ public:
      */
     bool isDryRun() const;
 
+    /**
+     * @brief 设置双层表头中 dose/focus 数值映射参数。
+     *
+     * 横向列使用 dose，纵向行使用 focus。
+     * 原表头中数值 0 对应中心点 center，其余按 step 递进。
+     */
+    void setAxisHeaderConfig(double doseCenter, double doseStep, double focusCenter,
+                             double focusStep);
+
 private slots:
     /** @brief 处理“保存”按钮点击事件。 */
     void on_btnSave_clicked();
@@ -232,6 +241,12 @@ private:
     bool m_previewOnly;
     double m_itemScale;
     bool m_syncingSelectAll;
+
+    bool m_axisHeaderConfigEnabled;
+    double m_doseCenter;
+    double m_doseStep;
+    double m_focusCenter;
+    double m_focusStep;
 
     // 悬停预览相关
     /** @brief 悬停预览窗格的指针（在主窗口内作为 tooltip 风格的 QLabel）。 */

@@ -10,8 +10,10 @@
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QLabel>
+#include <QLocale>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QPixmap>
 #include <QProgressBar>
 #include <QSettings>
@@ -22,6 +24,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <pugixml.hpp>
 #include <set>
 #include <unordered_set>
@@ -55,6 +58,61 @@ bool splitCellRef(const QString& ref, QString& colPart, QString& rowPart) {
     }
     return !colPart.isEmpty() && !rowPart.isEmpty();
 }
+
+class AxisCornerWidget : public QWidget {
+public:
+    explicit AxisCornerWidget(QWidget* parent = nullptr) : QWidget(parent) {}
+
+protected:
+    void paintEvent(QPaintEvent* event) override {
+        QWidget::paintEvent(event);
+        QPainter painter(this);
+        painter.fillRect(rect(), palette().window());
+        painter.setPen(palette().mid().color());
+        painter.drawRect(rect().adjusted(0, 0, -1, -1));
+        painter.setPen(palette().text().color());
+        painter.drawLine(0, 0, width() - 1, height() - 1);
+        painter.drawText(QRect(4, height() / 2, width() / 2 - 6, height() / 2),
+                         Qt::AlignLeft | Qt::AlignBottom, "Focus");
+        painter.drawText(QRect(width() / 2, 2, width() / 2 - 4, height() / 2 - 4),
+                         Qt::AlignRight | Qt::AlignTop, "Dose");
+    }
+};
+
+std::optional<double> parseHeaderNumber(const QString& headerText) {
+    const QString text = headerText.trimmed();
+    if (text.isEmpty()) {
+        return std::nullopt;
+    }
+    bool ok = false;
+    const double value = QLocale::c().toDouble(text, &ok);
+    if (!ok) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+QString formatAxisValue(double value) {
+    QString text = QString::number(value, 'f', 6);
+    while (text.contains('.') && (text.endsWith('0') || text.endsWith('.'))) {
+        if (text.endsWith('.')) {
+            text.chop(1);
+            break;
+        }
+        text.chop(1);
+    }
+    return text;
+}
+
+QString buildAxisValueText(const QString& headerText, double center, double step, bool isDose) {
+    auto headerValue = parseHeaderNumber(headerText);
+    if (!headerValue.has_value()) {
+        return headerText;
+    }
+    const double axisValue =
+        isDose ? (center + headerValue.value() * step) : (center - headerValue.value() * step);
+    return formatAxisValue(axisValue);
+}
 }  // namespace
 
 using namespace cc::neolux::fem::xlsxeditor;
@@ -69,6 +127,11 @@ XLSXEditor::XLSXEditor(QWidget* parent, bool dry_run)
       m_previewOnly(false),
       m_itemScale(1.0),
       m_syncingSelectAll(false),
+      m_axisHeaderConfigEnabled(false),
+      m_doseCenter(0.0),
+      m_doseStep(0.0),
+      m_focusCenter(0.0),
+      m_focusStep(0.0),
       m_hoverPreview(nullptr),
       m_hoverRow(-1),
       m_hoverCol(-1),
@@ -169,6 +232,15 @@ void XLSXEditor::setDryRun(bool dry_run) {
 
 bool XLSXEditor::isDryRun() const {
     return m_dryRun;
+}
+
+void XLSXEditor::setAxisHeaderConfig(double doseCenter, double doseStep, double focusCenter,
+                                     double focusStep) {
+    m_axisHeaderConfigEnabled = true;
+    m_doseCenter = doseCenter;
+    m_doseStep = doseStep;
+    m_focusCenter = focusCenter;
+    m_focusStep = focusStep;
 }
 
 void XLSXEditor::parseRange(const QString& range, int& startRow, int& startCol, int& endRow,
@@ -382,22 +454,37 @@ void XLSXEditor::displayData(bool previewOnly) {
 
     QHash<int, int> rowToGridRow;
     QHash<int, int> colToGridCol;
+    const int headerLayers = m_axisHeaderConfigEnabled ? 2 : 1;
     for (int i = 0; i < displayRows.size(); ++i) {
-        rowToGridRow.insert(displayRows[i], i + 1);
+        rowToGridRow.insert(displayRows[i], i + headerLayers);
     }
     for (int i = 0; i < displayCols.size(); ++i) {
-        colToGridCol.insert(displayCols[i], i + 1);
+        colToGridCol.insert(displayCols[i], i + headerLayers);
     }
 
     const int headerWidth = static_cast<int>(std::round(kBaseHeaderColWidth * m_itemScale));
     const int headerHeight = static_cast<int>(std::round(kBaseHeaderRowHeight * m_itemScale));
+    const int focusInnerHeaderWidth =
+        m_axisHeaderConfigEnabled
+            ? static_cast<int>(std::round(kBaseHeaderColWidth * 0.65 * m_itemScale))
+            : headerWidth;
 
-    QLabel* corner = new QLabel(this);
-    corner->setText(" ");
-    corner->setAlignment(Qt::AlignCenter);
-    corner->setFixedSize(headerWidth, headerHeight);
-    layout->addWidget(corner, 0, 0);
-    m_headerWidgets.append(corner);
+    if (m_axisHeaderConfigEnabled) {
+        AxisCornerWidget* corner = new AxisCornerWidget(this);
+        corner->setFixedSize(headerWidth + focusInnerHeaderWidth, headerHeight * 2);
+        layout->addWidget(corner, 0, 0, 2, 2);
+        m_headerWidgets.append(corner);
+    } else {
+        QLabel* corner = new QLabel(this);
+        corner->setText(" ");
+        corner->setAlignment(Qt::AlignCenter);
+        corner->setFixedSize(headerWidth, headerHeight);
+        layout->addWidget(corner, 0, 0);
+        m_headerWidgets.append(corner);
+    }
+
+    QVector<QString> colHeaders;
+    colHeaders.reserve(displayCols.size());
 
     for (int i = 0; i < displayCols.size(); ++i) {
         const int col = displayCols[i];
@@ -405,37 +492,80 @@ void XLSXEditor::displayData(bool previewOnly) {
         if (header.isEmpty()) {
             header = numToCol(col);
         }
+        colHeaders.append(header);
+    }
 
-        QLabel* colHeader = new QLabel(this);
-        colHeader->setText(header);
-        colHeader->setAlignment(Qt::AlignCenter);
-        colHeader->setWordWrap(true);
-        colHeader->setToolTip(tx("Double-click to toggle this column"));
-        colHeader->setProperty("batchAxis", "col");
-        colHeader->setProperty("batchIndex", col);
-        colHeader->installEventFilter(this);
-        colHeader->setFixedSize(static_cast<int>(std::round(kBaseItemWidth * m_itemScale)),
-                                headerHeight);
-        layout->addWidget(colHeader, 0, i + 1);
-        m_headerWidgets.append(colHeader);
+    QVector<QString> rowHeaders;
+    rowHeaders.reserve(displayRows.size());
+    for (int i = 0; i < displayRows.size(); ++i) {
+        const int row = displayRows[i];
+        QString header = readCellText(row, 1);
+        if (header.isEmpty()) {
+            header = QString::number(row);
+        }
+        rowHeaders.append(header);
+    }
+
+    const int itemWidth = static_cast<int>(std::round(kBaseItemWidth * m_itemScale));
+    const int itemHeight = static_cast<int>(std::round(kBaseItemHeight * m_itemScale));
+
+    for (int i = 0; i < displayCols.size(); ++i) {
+        const int col = displayCols[i];
+        QLabel* outerHeader = new QLabel(this);
+        outerHeader->setText(colHeaders[i]);
+        outerHeader->setAlignment(Qt::AlignCenter);
+        outerHeader->setWordWrap(true);
+        outerHeader->setToolTip(tx("Double-click to toggle this column"));
+        outerHeader->setProperty("batchAxis", "col");
+        outerHeader->setProperty("batchIndex", col);
+        outerHeader->installEventFilter(this);
+        outerHeader->setFixedSize(itemWidth, headerHeight);
+        layout->addWidget(outerHeader, 0, i + headerLayers);
+        m_headerWidgets.append(outerHeader);
+
+        if (m_axisHeaderConfigEnabled) {
+            QLabel* innerHeader = new QLabel(this);
+            innerHeader->setText(buildAxisValueText(colHeaders[i], m_doseCenter, m_doseStep, true));
+            innerHeader->setAlignment(Qt::AlignCenter);
+            innerHeader->setWordWrap(true);
+            innerHeader->setToolTip(tx("Double-click to toggle this column"));
+            innerHeader->setProperty("batchAxis", "col");
+            innerHeader->setProperty("batchIndex", col);
+            innerHeader->installEventFilter(this);
+            innerHeader->setFixedSize(itemWidth, headerHeight);
+            layout->addWidget(innerHeader, 1, i + headerLayers);
+            m_headerWidgets.append(innerHeader);
+        }
     }
 
     for (int i = 0; i < displayRows.size(); ++i) {
         const int row = displayRows[i];
-        QString header = readCellText(row, 1);
+        QLabel* outerHeader = new QLabel(this);
+        outerHeader->setText(rowHeaders[i]);
+        outerHeader->setAlignment(Qt::AlignCenter);
+        outerHeader->setWordWrap(true);
+        outerHeader->setToolTip(tx("Double-click to toggle this row"));
+        outerHeader->setProperty("batchAxis", "row");
+        outerHeader->setProperty("batchIndex", row);
+        outerHeader->installEventFilter(this);
+        outerHeader->setFixedSize(headerWidth, itemHeight);
+        layout->addWidget(outerHeader, i + headerLayers, 0);
+        m_headerWidgets.append(outerHeader);
 
-        QLabel* rowHeader = new QLabel(this);
-        rowHeader->setText(header);
-        rowHeader->setAlignment(Qt::AlignCenter);
-        rowHeader->setWordWrap(true);
-        rowHeader->setToolTip(tx("Double-click to toggle this row"));
-        rowHeader->setProperty("batchAxis", "row");
-        rowHeader->setProperty("batchIndex", row);
-        rowHeader->installEventFilter(this);
-        rowHeader->setFixedSize(headerWidth,
-                                static_cast<int>(std::round(kBaseItemHeight * m_itemScale)));
-        layout->addWidget(rowHeader, i + 1, 0);
-        m_headerWidgets.append(rowHeader);
+        if (m_axisHeaderConfigEnabled) {
+            QLabel* innerHeader = new QLabel(this);
+            innerHeader->setText(
+                buildAxisValueText(rowHeaders[i], m_focusCenter, m_focusStep, false));
+            innerHeader->setAlignment(Qt::AlignCenter);
+            innerHeader->setWordWrap(true);
+            innerHeader->setToolTip(tx("Double-click to toggle this row"));
+            innerHeader->setProperty("batchAxis", "row");
+            innerHeader->setProperty("batchIndex", row);
+            innerHeader->installEventFilter(this);
+            innerHeader->setFixedSize(focusInnerHeaderWidth, itemHeight);
+            layout->addWidget(innerHeader, i + headerLayers, 1);
+            m_headerWidgets.append(innerHeader);
+        }
     }
 
     for (int i = 0; i < m_data.size(); ++i) {
@@ -1123,11 +1253,20 @@ void XLSXEditor::updateScrollWidgetSize() {
     const int itemH = static_cast<int>(std::round(kBaseItemHeight * m_itemScale));
     const int headerW = static_cast<int>(std::round(kBaseHeaderColWidth * m_itemScale));
     const int headerH = static_cast<int>(std::round(kBaseHeaderRowHeight * m_itemScale));
+    const int headerLayers = m_axisHeaderConfigEnabled ? 2 : 1;
+    const int focusInnerHeaderW =
+        m_axisHeaderConfigEnabled
+            ? static_cast<int>(std::round(kBaseHeaderColWidth * 0.65 * m_itemScale))
+            : headerW;
+    const int totalHeaderBandW =
+        m_axisHeaderConfigEnabled ? (headerW + focusInnerHeaderW) : headerW;
 
-    const int contentW =
-        colCount > 0 ? headerW + colCount * itemW + colCount * kGridSpacing : headerW;
-    const int contentH =
-        rowCount > 0 ? headerH + rowCount * itemH + rowCount * kGridSpacing : headerH;
+    const int contentW = colCount > 0
+                             ? totalHeaderBandW + colCount * itemW + colCount * kGridSpacing
+                             : totalHeaderBandW;
+    const int contentH = rowCount > 0
+                             ? headerLayers * headerH + rowCount * itemH + rowCount * kGridSpacing
+                             : headerLayers * headerH;
 
     ui->scrollWidget->resize(contentW, contentH);
     ui->scrollWidget->setMinimumSize(contentW, contentH);
