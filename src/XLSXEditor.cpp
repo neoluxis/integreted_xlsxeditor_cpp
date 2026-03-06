@@ -622,6 +622,10 @@ void XLSXEditor::displayData(bool previewOnly) {
             syncPreviewVisibility();
             syncSelectAllState();
         });
+        connect(item, &DataItem::descriptionEdited, [this, i](const QString& text) {
+            m_data[i].desc = text;
+            m_dirtyCells.insert(cellKey(m_data[i].row, m_data[i].col));
+        });
         connect(item, &DataItem::imageEntered, this, &XLSXEditor::showHoverPreview);
         connect(item, &DataItem::imageLeft, this, &XLSXEditor::hideHoverPreview);
         m_dataItems.append(item);
@@ -947,6 +951,8 @@ bool XLSXEditor::saveFakeDelete() {
         QString descCell = numToCol(entry.col) + QString::number(entry.row + 1);
         cc::neolux::utils::MiniXLSX::CellStyle cs;
         cs.backgroundColor = entry.deleted ? "#FF0000" : "";
+        m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+                                entry.desc.toStdString());
         m_wrapper->setCellStyle(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
                                 cs);
         updateSaveProgress(++progress);
@@ -974,6 +980,9 @@ bool XLSXEditor::saveRealDelete() {
         if (entry.deleted) {
             m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
                                     "");
+        } else {
+            m_wrapper->setCellValue(static_cast<unsigned int>(m_sheetIndex), descCell.toStdString(),
+                                    entry.desc.toStdString());
         }
         updateSaveProgress(++progress);
     }

@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QEvent>
 #include <QLabel>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QSizePolicy>
@@ -42,6 +43,19 @@ DataItem::DataItem(QWidget* parent)
     ui->lnData->setReadOnly(true);  // 数据只读，防止误修改
     ui->lnData->setToolTip(tx("Double-click to keep/remove"));
     ui->lnData->installEventFilter(this);
+    ui->lnData->setProperty("lastCommittedText", ui->lnData->text());
+    connect(ui->lnData, &QLineEdit::editingFinished, this, [this]() {
+        if (!ui || !ui->lnData) {
+            return;
+        }
+        const QString current = ui->lnData->text();
+        const QString last = ui->lnData->property("lastCommittedText").toString();
+        ui->lnData->setReadOnly(true);
+        if (current != last) {
+            ui->lnData->setProperty("lastCommittedText", current);
+            emit descriptionEdited(current);
+        }
+    });
     const qreal basePointSize =
         ui->lnData->font().pointSizeF() > 0 ? ui->lnData->font().pointSizeF() : 9.0;
     ui->lnData->setProperty("basePointSizeF", basePointSize);
@@ -70,6 +84,7 @@ void DataItem::setImage(const QImage& image) {
 
 void DataItem::setDescription(const QString& desc) {
     ui->lnData->setText(desc);
+    ui->lnData->setProperty("lastCommittedText", desc);
 }
 
 QString DataItem::getDescription() const {
@@ -134,10 +149,33 @@ void DataItem::applyScale(double scale) {
 }
 
 bool DataItem::eventFilter(QObject* watched, QEvent* event) {
-    if (watched == ui->lnData && event->type() == QEvent::MouseButtonDblClick) {
-        setDeleted(!m_deleted);
-        emit deleteToggled(m_deleted);
-        return true;
+    if (watched == ui->lnData) {
+        if (event->type() == QEvent::MouseButtonDblClick) {
+            if (!ui->lnData->isReadOnly()) {
+                return QWidget::eventFilter(watched, event);
+            }
+            setDeleted(!m_deleted);
+            emit deleteToggled(m_deleted);
+            return true;
+        }
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::RightButton) {
+                QMenu menu(this);
+                QAction* markAction = menu.addAction(m_deleted ? tx("Unmark") : tx("Mark"));
+                QAction* editAction = menu.addAction(tx("Modify Value"));
+                QAction* chosen = menu.exec(me->globalPosition().toPoint());
+                if (chosen == markAction) {
+                    setDeleted(!m_deleted);
+                    emit deleteToggled(m_deleted);
+                } else if (chosen == editAction) {
+                    ui->lnData->setReadOnly(false);
+                    ui->lnData->setFocus(Qt::MouseFocusReason);
+                    ui->lnData->selectAll();
+                }
+                return true;
+            }
+        }
     }
 
     if (watched == ui->btnImage) {

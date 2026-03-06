@@ -118,6 +118,12 @@ signals:
      */
     void deleteToggled(bool deleted);
 
+    /**
+     * @brief 描述值被修改时发射。
+     * @param text 修改后的文本。
+     */
+    void descriptionEdited(const QString& text);
+
 protected:
     /**
      * @brief 事件过滤器，用于处理描述框双击切换删除状态与图片预览事件。
