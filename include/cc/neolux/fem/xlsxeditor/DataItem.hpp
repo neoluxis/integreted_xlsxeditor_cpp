@@ -2,6 +2,7 @@
 
 #include <QImage>
 #include <QPoint>
+#include <QRect>
 #include <QString>
 #include <QWidget>
 
@@ -18,7 +19,7 @@ namespace xlsxeditor {
  * @brief 单个图片-描述数据展示组件。
  *
  * 该组件用于在网格中展示一组数据：
- * - 图片按钮（悬停可预览）
+ * - 图片按钮（中键点击可预览）
  * - 描述输入框（双击切换删除状态）
  */
 class DataItem : public QWidget {
@@ -98,7 +99,7 @@ public:
 
 signals:
     /**
-     * @brief 当鼠标进入图片区域时发射（用于悬停预览）。
+     * @brief 当图片区域收到中键点击时发射（用于触发预览）。
      * @param row 图片所在的工作表行（1-based）。
      * @param col 图片所在的工作表列（1-based）。
      */
@@ -119,7 +120,7 @@ signals:
 
 protected:
     /**
-     * @brief 事件过滤器，用于处理描述框双击切换删除状态与图片悬停事件。
+     * @brief 事件过滤器，用于处理描述框双击切换删除状态与图片预览事件。
      * @param watched 事件源对象。
      * @param event 事件对象。
      * @return true 表示事件已处理，false 表示继续默认分发。
@@ -138,6 +139,12 @@ public:
      * @return QPoint 局部左上角的全局坐标，用于在主界面中定位预览窗格。
      */
     QPoint imageWidgetGlobalPos() const;
+
+    /**
+     * @brief 返回内部图片按钮在屏幕全局坐标系中的矩形区域。
+     * @return QRect 图片按钮的全局区域，空值表示不可用。
+     */
+    QRect imageWidgetGlobalRect() const;
 
 private:
     Ui::DataItem* ui;

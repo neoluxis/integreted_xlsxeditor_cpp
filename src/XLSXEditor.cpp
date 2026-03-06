@@ -2,6 +2,7 @@
 
 #include <QCheckBox>
 #include <QCoreApplication>
+#include <QCursor>
 #include <QDebug>
 #include <QDialog>
 #include <QDir>
@@ -145,6 +146,32 @@ XLSXEditor::XLSXEditor(QWidget* parent, bool dry_run)
     m_hoverHideTimer = new QTimer(this);
     m_hoverHideTimer->setSingleShot(true);
     connect(m_hoverHideTimer, &QTimer::timeout, this, [this]() {
+        const QPoint cursorPos = QCursor::pos();
+        bool inValidRange = false;
+
+        if (m_hoverPreview && m_hoverPreview->isVisible()) {
+            const QPoint p = m_hoverPreview->mapFromGlobal(cursorPos);
+            if (m_hoverPreview->rect().contains(p)) {
+                inValidRange = true;
+            }
+        }
+
+        if (!inValidRange && m_hoverRow >= 0 && m_hoverCol >= 0) {
+            auto it = m_itemByCell.find(cellKey(m_hoverRow, m_hoverCol));
+            if (it != m_itemByCell.end() && it.value() != nullptr) {
+                DataItem* anchor = it.value();
+                const QRect imageRectGlobal = anchor->imageWidgetGlobalRect();
+                if (imageRectGlobal.isValid() && imageRectGlobal.contains(cursorPos)) {
+                    inValidRange = true;
+                }
+            }
+        }
+
+        if (inValidRange) {
+            m_hoverHideTimer->start(120);
+            return;
+        }
+
         if (m_hoverPreview) {
             m_hoverPreview->hide();
         }
@@ -651,9 +678,12 @@ bool XLSXEditor::eventFilter(QObject* watched, QEvent* event) {
             if (m_hoverHideTimer) m_hoverHideTimer->stop();
             return true;
         } else if (event->type() == QEvent::Leave) {
-            if (m_hoverRow >= 0 && m_hoverCol >= 0) {
-                if (m_hoverHideTimer) m_hoverHideTimer->start(150);
+            if (m_hoverHideTimer) m_hoverHideTimer->stop();
+            if (m_hoverPreview) {
+                m_hoverPreview->hide();
             }
+            m_hoverRow = -1;
+            m_hoverCol = -1;
             return true;
         } else if (event->type() == QEvent::MouseButtonPress) {
             auto* me = static_cast<QMouseEvent*>(event);
@@ -1199,40 +1229,33 @@ void XLSXEditor::showHoverPreview(int row, int col) {
     QSize finalSize = scaled.size();
     m_hoverPreview->setFixedSize(finalSize);
 
-    const QPoint globalPos = item->imageWidgetGlobalPos();
-    const QPoint localPos = this->mapFromGlobal(globalPos);
+    const QPoint cursorGlobal = QCursor::pos();
     int previewW = finalSize.width();
     int previewH = finalSize.height();
-    int x = localPos.x() + 20;
-    int y = localPos.y() - previewH - 10;
-    if (y < 0) {
-        y = localPos.y() + 20;
-    }
-    if (x + previewW > this->width()) {
-        x = this->width() - previewW - 10;
-        if (x < 0) x = 0;
-    }
+    int x = cursorGlobal.x() - previewW / 2;
+    int y = cursorGlobal.y() - previewH / 2;
 
     // 将预览移动到合适位置，停止隐藏计时器并显示
     m_hoverPreview->move(x, y);
     m_hoverHideTimer->stop();
     m_hoverPreview->show();
+
+    // 若受窗口管理器影响导致初始位置偏移，确保鼠标落在预览窗内。
+    const QRect shownRect = m_hoverPreview->frameGeometry();
+    if (!shownRect.contains(cursorGlobal)) {
+        const int correctedX = cursorGlobal.x() - previewW / 2;
+        const int correctedY = cursorGlobal.y() - previewH / 2;
+        m_hoverPreview->move(correctedX, correctedY);
+    }
+
     m_hoverRow = row;
     m_hoverCol = col;
 }
 
 void XLSXEditor::hideHoverPreview(int row, int col) {
-    if (!m_hoverPreview) return;
-    if (m_hoverRow == row && m_hoverCol == col) {
-        if (m_hoverHideTimer) {
-            // 启动延迟隐藏，给可能从图片移动到预览窗格的鼠标留出缓冲时间
-            m_hoverHideTimer->start(150);
-        } else {
-            m_hoverPreview->hide();
-            m_hoverRow = -1;
-            m_hoverCol = -1;
-        }
-    }
+    Q_UNUSED(row);
+    Q_UNUSED(col);
+    // 关闭逻辑只由预览窗自身 Leave 事件驱动，避免从图片区域移出导致误关闭。
 }
 
 void XLSXEditor::updateScrollWidgetSize() {

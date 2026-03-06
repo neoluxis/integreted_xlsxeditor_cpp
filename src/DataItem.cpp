@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QEvent>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QPixmap>
 #include <QSizePolicy>
 #include <algorithm>
@@ -36,7 +37,7 @@ DataItem::DataItem(QWidget* parent)
     ui->gridLayout->setSpacing(0);
     ui->btnImage->setFlat(true);
     ui->btnImage->setStyleSheet("QPushButton { border: 0; padding: 0; margin: 0; }");
-    // 改为通过悬停预览：安装事件过滤器以捕获 Enter/Leave
+    // 图片预览交互：中键点击触发预览，离开按钮区域触发关闭
     ui->btnImage->installEventFilter(this);
     ui->lnData->setReadOnly(true);  // 数据只读，防止误修改
     ui->lnData->setToolTip(tx("Double-click to keep/remove"));
@@ -140,13 +141,13 @@ bool DataItem::eventFilter(QObject* watched, QEvent* event) {
     }
 
     if (watched == ui->btnImage) {
-        // 鼠标进入图片按钮：通知父组件显示悬停预览
-        if (event->type() == QEvent::Enter) {
-            emit imageEntered(m_row, m_col);
-            return true;
-        }
-        // 鼠标离开图片按钮：通知父组件隐藏（或延迟隐藏）悬停预览
-        else if (event->type() == QEvent::Leave) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::MiddleButton) {
+                emit imageEntered(m_row, m_col);
+                return true;
+            }
+        } else if (event->type() == QEvent::Leave) {
             emit imageLeft(m_row, m_col);
             return true;
         }
@@ -171,6 +172,14 @@ QPoint DataItem::imageWidgetGlobalPos() const {
         return QPoint();
     }
     return ui->btnImage->mapToGlobal(QPoint(0, 0));
+}
+
+QRect DataItem::imageWidgetGlobalRect() const {
+    if (!ui || !ui->btnImage) {
+        return QRect();
+    }
+    const QPoint topLeft = ui->btnImage->mapToGlobal(QPoint(0, 0));
+    return QRect(topLeft, ui->btnImage->size());
 }
 
 }  // namespace cc::neolux::fem::xlsxeditor
