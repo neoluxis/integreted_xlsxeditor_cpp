@@ -18,10 +18,6 @@ constexpr int kBaseItemHeight = 90;
 constexpr int kBaseContentSize = 68;
 constexpr int kBaseIconSize = 66;
 constexpr double kInnerGapPercent = 0.3;
-
-QString tx(const char* sourceText) {
-    return QCoreApplication::translate("DataItem", sourceText);
-}
 }  // namespace
 
 namespace cc::neolux::fem::xlsxeditor {
@@ -41,7 +37,7 @@ DataItem::DataItem(QWidget* parent)
     // 图片预览交互：中键点击触发预览，离开按钮区域触发关闭
     ui->btnImage->installEventFilter(this);
     ui->lnData->setReadOnly(true);  // 数据只读，防止误修改
-    ui->lnData->setToolTip(tx("Double-click to keep/remove"));
+    ui->lnData->setToolTip(QCoreApplication::translate("DataItem", "Double-click to keep/remove"));
     ui->lnData->installEventFilter(this);
     ui->lnData->setProperty("lastCommittedText", ui->lnData->text());
     connect(ui->lnData, &QLineEdit::editingFinished, this, [this]() {
@@ -162,8 +158,11 @@ bool DataItem::eventFilter(QObject* watched, QEvent* event) {
             auto* me = static_cast<QMouseEvent*>(event);
             if (me->button() == Qt::RightButton) {
                 QMenu menu;
-                QAction* markAction = menu.addAction(m_deleted ? tx("Unmark") : tx("Mark"));
-                QAction* editAction = menu.addAction(tx("Modify Value"));
+                QAction* markAction =
+                    menu.addAction(m_deleted ? QCoreApplication::translate("DataItem", "Unmark")
+                                             : QCoreApplication::translate("DataItem", "Mark"));
+                QAction* editAction =
+                    menu.addAction(QCoreApplication::translate("DataItem", "Modify Value"));
                 QAction* chosen = menu.exec(me->globalPosition().toPoint());
                 if (chosen == markAction) {
                     setDeleted(!m_deleted);

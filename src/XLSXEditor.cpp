@@ -43,10 +43,6 @@ constexpr int kBaseHeaderRowHeight = 24;
 constexpr int kGridSpacing = 0;
 constexpr bool kEnableSaveProgress = true;
 
-QString tx(const char* sourceText) {
-    return QCoreApplication::translate("XLSXEditor", sourceText);
-}
-
 bool splitCellRef(const QString& ref, QString& colPart, QString& rowPart) {
     colPart.clear();
     rowPart.clear();
@@ -211,13 +207,17 @@ void XLSXEditor::loadXLSX(const QString& filePath, const QString& sheetName, con
 
     m_wrapper = new cc::neolux::utils::MiniXLSX::OpenXLSXWrapper();
     if (!m_wrapper->open(filePath.toStdString())) {
-        QMessageBox::critical(this, tx("Error"), tx("Failed to open XLSX file."));
+        QMessageBox::critical(
+            this, QCoreApplication::translate("XLSXEditor", "Error"),
+            QCoreApplication::translate("XLSXEditor", "Failed to open XLSX file."));
         ui->progressBar->setVisible(false);
         return;
     }
 
     if (!m_pictureReader.open(filePath.toStdString())) {
-        QMessageBox::critical(this, tx("Error"), tx("Failed to prepare picture reader."));
+        QMessageBox::critical(
+            this, QCoreApplication::translate("XLSXEditor", "Error"),
+            QCoreApplication::translate("XLSXEditor", "Failed to prepare picture reader."));
         m_wrapper->close();
         ui->progressBar->setVisible(false);
         return;
@@ -232,7 +232,9 @@ void XLSXEditor::loadXLSX(const QString& filePath, const QString& sheetName, con
         }
     }
     if (m_sheetIndex < 0) {
-        QMessageBox::critical(this, tx("Error"), tx("Sheet not found: %1").arg(sheetName));
+        QMessageBox::critical(
+            this, QCoreApplication::translate("XLSXEditor", "Error"),
+            QCoreApplication::translate("XLSXEditor", "Sheet not found: %1").arg(sheetName));
         ui->progressBar->setVisible(false);
         return;
     }
@@ -542,7 +544,8 @@ void XLSXEditor::displayData(bool previewOnly) {
         outerHeader->setText(colHeaders[i]);
         outerHeader->setAlignment(Qt::AlignCenter);
         outerHeader->setWordWrap(true);
-        outerHeader->setToolTip(tx("Double-click to toggle this column"));
+        outerHeader->setToolTip(
+            QCoreApplication::translate("XLSXEditor", "Double-click to toggle this column"));
         outerHeader->setProperty("batchAxis", "col");
         outerHeader->setProperty("batchIndex", col);
         outerHeader->installEventFilter(this);
@@ -555,7 +558,8 @@ void XLSXEditor::displayData(bool previewOnly) {
             innerHeader->setText(buildAxisValueText(colHeaders[i], m_doseCenter, m_doseStep, true));
             innerHeader->setAlignment(Qt::AlignCenter);
             innerHeader->setWordWrap(true);
-            innerHeader->setToolTip(tx("Double-click to toggle this column"));
+            innerHeader->setToolTip(
+                QCoreApplication::translate("XLSXEditor", "Double-click to toggle this column"));
             innerHeader->setProperty("batchAxis", "col");
             innerHeader->setProperty("batchIndex", col);
             innerHeader->installEventFilter(this);
@@ -571,7 +575,8 @@ void XLSXEditor::displayData(bool previewOnly) {
         outerHeader->setText(rowHeaders[i]);
         outerHeader->setAlignment(Qt::AlignCenter);
         outerHeader->setWordWrap(true);
-        outerHeader->setToolTip(tx("Double-click to toggle this row"));
+        outerHeader->setToolTip(
+            QCoreApplication::translate("XLSXEditor", "Double-click to toggle this row"));
         outerHeader->setProperty("batchAxis", "row");
         outerHeader->setProperty("batchIndex", row);
         outerHeader->installEventFilter(this);
@@ -585,7 +590,8 @@ void XLSXEditor::displayData(bool previewOnly) {
                 buildAxisValueText(rowHeaders[i], m_focusCenter, m_focusStep, false));
             innerHeader->setAlignment(Qt::AlignCenter);
             innerHeader->setWordWrap(true);
-            innerHeader->setToolTip(tx("Double-click to toggle this row"));
+            innerHeader->setToolTip(
+                QCoreApplication::translate("XLSXEditor", "Double-click to toggle this row"));
             innerHeader->setProperty("batchAxis", "row");
             innerHeader->setProperty("batchIndex", row);
             innerHeader->installEventFilter(this);
@@ -639,10 +645,13 @@ void XLSXEditor::displayData(bool previewOnly) {
 
 void XLSXEditor::on_btnSave_clicked() {
     if (saveData()) {
-        QMessageBox::information(this, tx("Save"),
-                                 tx("Data saved to XLSX: %1").arg(m_saveFilePath));
+        QMessageBox::information(this, QCoreApplication::translate("XLSXEditor", "Save"),
+                                 QCoreApplication::translate("XLSXEditor", "Data saved to XLSX: %1")
+                                     .arg(m_saveFilePath));
     } else {
-        QMessageBox::critical(this, tx("Save Error"), tx("Failed to save data to XLSX."));
+        QMessageBox::critical(
+            this, QCoreApplication::translate("XLSXEditor", "Save Error"),
+            QCoreApplication::translate("XLSXEditor", "Failed to save data to XLSX."));
     }
 }
 
@@ -920,7 +929,7 @@ void XLSXEditor::beginSaveProgress(int maximum) {
     ui->progressBar->setMinimum(0);
     ui->progressBar->setMaximum(std::max(1, maximum));
     ui->progressBar->setValue(0);
-    ui->progressBar->setFormat(tx("Saving... %p%"));
+    ui->progressBar->setFormat(QCoreApplication::translate("XLSXEditor", "Saving... %p%"));
     ui->progressBar->setVisible(true);
     QCoreApplication::processEvents();
 }
@@ -1308,7 +1317,8 @@ void XLSXEditor::syncPreviewButtonText() {
     if (!ui || !ui->btnPreview) {
         return;
     }
-    ui->btnPreview->setText(m_previewOnly ? tx("Show All") : tx("Preview"));
+    ui->btnPreview->setText(m_previewOnly ? QCoreApplication::translate("XLSXEditor", "Show All")
+                                          : QCoreApplication::translate("XLSXEditor", "Preview"));
 }
 
 void XLSXEditor::syncPreviewVisibility() {
