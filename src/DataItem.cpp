@@ -161,7 +161,7 @@ bool DataItem::eventFilter(QObject* watched, QEvent* event) {
         if (event->type() == QEvent::MouseButtonPress) {
             auto* me = static_cast<QMouseEvent*>(event);
             if (me->button() == Qt::RightButton) {
-                QMenu menu(this);
+                QMenu menu;
                 QAction* markAction = menu.addAction(m_deleted ? tx("Unmark") : tx("Mark"));
                 QAction* editAction = menu.addAction(tx("Modify Value"));
                 QAction* chosen = menu.exec(me->globalPosition().toPoint());
